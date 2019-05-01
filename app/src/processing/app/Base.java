@@ -26,6 +26,7 @@ import cc.arduino.Compiler;
 import cc.arduino.Constants;
 import cc.arduino.UpdatableBoardsLibsFakeURLsHandler;
 import cc.arduino.UploaderUtils;
+import cc.arduino.packages.Uploader;
 import cc.arduino.contributions.*;
 import cc.arduino.contributions.libraries.*;
 import cc.arduino.contributions.libraries.ui.LibraryManagerUI;
@@ -41,10 +42,14 @@ import cc.arduino.view.SplashScreenHelper;
 
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+
+import com.github.zafarkhaja.semver.Version;
+
 import processing.app.debug.TargetBoard;
 import processing.app.debug.TargetPackage;
 import processing.app.debug.TargetPlatform;
 import processing.app.helpers.*;
+import processing.app.helpers.OSUtils;
 import processing.app.helpers.filefilters.OnlyDirs;
 import processing.app.helpers.filefilters.OnlyFilesWithExtension;
 import processing.app.javax.swing.filechooser.FileNameExtensionFilter;
@@ -71,6 +76,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static processing.app.I18n.format;
 import static processing.app.I18n.tr;
 
 
@@ -261,6 +267,8 @@ public class Base {
     splash.splashText(tr("Initializing packages..."));
     BaseNoGui.initPackages();
 
+    parser.getUploadPort().ifPresent(BaseNoGui::selectSerialPort);
+
     splash.splashText(tr("Preparing boards..."));
 
     if (!isCommandLine()) {
@@ -305,7 +313,12 @@ public class Base {
 
       ContributedPlatform selected = null;
       if (boardToInstallParts.length == 3) {
-        selected = indexer.getIndex().findPlatform(boardToInstallParts[0], boardToInstallParts[1], VersionHelper.valueOf(boardToInstallParts[2]).toString());
+        Optional<Version> version = VersionHelper.valueOf(boardToInstallParts[2]);
+        if (!version.isPresent()) {
+          System.out.println(format(tr("Invalid version {0}"), boardToInstallParts[2]));
+          System.exit(1);
+        }
+        selected = indexer.getIndex().findPlatform(boardToInstallParts[0], boardToInstallParts[1], version.get().toString());
       } else if (boardToInstallParts.length == 2) {
         List<ContributedPlatform> platformsByName = indexer.getIndex().findPlatforms(boardToInstallParts[0], boardToInstallParts[1]);
         Collections.sort(platformsByName, new DownloadableContributionVersionComparator());
@@ -346,7 +359,12 @@ public class Base {
 
         ContributedLibrary selected = null;
         if (libraryToInstallParts.length == 2) {
-          selected = indexer.getIndex().find(libraryToInstallParts[0], VersionHelper.valueOf(libraryToInstallParts[1]).toString());
+          Optional<Version> version = VersionHelper.valueOf(libraryToInstallParts[1]);
+          if (!version.isPresent()) {
+            System.out.println(format(tr("Invalid version {0}"), libraryToInstallParts[1]));
+            System.exit(1);
+          }
+          selected = indexer.getIndex().find(libraryToInstallParts[0], version.get().toString());
         } else if (libraryToInstallParts.length == 1) {
           List<ContributedLibrary> librariesByName = indexer.getIndex().find(libraryToInstallParts[0]);
           Collections.sort(librariesByName, new DownloadableContributionVersionComparator());
@@ -450,7 +468,7 @@ public class Base {
         if (!parser.isForceSavePrefs())
           PreferencesData.setDoSave(true);
         if (handleOpen(file, retrieveSketchLocation(".default"), false) == null) {
-          String mess = I18n.format(tr("Failed to open sketch: \"{0}\""), path);
+          String mess = format(tr("Failed to open sketch: \"{0}\""), path);
           // Open failure is fatal in upload/verify mode
           if (parser.isVerifyOrUploadMode())
             showError(null, mess, 2);
@@ -910,46 +928,23 @@ public class Base {
    * @return true if succeeded in closing, false if canceled.
    */
   public boolean handleClose(Editor editor) {
-    // Check if modified
-//    boolean immediate = editors.size() == 1;
-    if (!editor.checkModified()) {
-      return false;
-    }
 
     if (editors.size() == 1) {
-      storeScreenDimensions();
-      storeSketches();
-
-      // This will store the sketch count as zero
-      editors.remove(editor);
-      try {
-        Editor.serialMonitor.close();
-      } catch (Exception e) {
-        //ignore
+      if (!handleQuit()) {
+        return false;
       }
-      rebuildRecentSketchesMenuItems();
-
-      // Save out the current prefs state
-      PreferencesData.save();
-
-      // Since this wasn't an actual Quit event, call System.exit()
-      System.exit(0);
-
+      // Everything called after handleQuit will only affect OSX
+      editor.setVisible(false);
+      editors.remove(editor);
     } else {
       // More than one editor window open,
       // proceed with closing the current window.
+      // Check if modified
+      if (!editor.checkModified()) {
+        return false;
+      }
       editor.setVisible(false);
       editor.dispose();
-//      for (int i = 0; i < editorCount; i++) {
-//        if (editor == editors[i]) {
-//          for (int j = i; j < editorCount-1; j++) {
-//            editors[j] = editors[j+1];
-//          }
-//          editorCount--;
-//          // Set to null so that garbage collection occurs
-//          editors[editorCount] = null;
-//        }
-//      }
       editors.remove(editor);
     }
     return true;
@@ -972,11 +967,19 @@ public class Base {
       // ignore
     }
 
+    // kill uploader (if still alive)
+    UploaderUtils uploaderInstance = new UploaderUtils();
+    Uploader uploader = uploaderInstance.getUploaderByPreferences(false);
+    if (uploader != null && uploader.programmerPid != null && uploader.programmerPid.isAlive()) {
+        // kill the stuck programmer
+        uploader.programmerPid.destroyForcibly();
+    }
+
     if (handleQuitEach()) {
       // Save out the current prefs state
       PreferencesData.save();
 
-      if (!OSUtils.hasMacOSStyleMenus()) {
+      if (!OSUtils.isMacOS()) {
         // If this was fired from the menu or an AppleEvent (the Finder),
         // then Mac OS X will send the terminate signal itself.
         System.exit(0);
@@ -1112,7 +1115,7 @@ public class Base {
             importMenu.addSeparator();
           }
           lastLibType = libType;
-          JMenuItem platformItem = new JMenuItem(I18n.format(tr("{0} libraries"), tr(lastLibType)));
+          JMenuItem platformItem = new JMenuItem(format(tr("{0} libraries"), tr(lastLibType)));
           platformItem.setEnabled(false);
           importMenu.add(platformItem);
         }
@@ -1123,7 +1126,7 @@ public class Base {
             try {
               activeEditor.getSketchController().importLibrary(l);
             } catch (IOException e) {
-              showWarning(tr("Error"), I18n.format("Unable to list header files in {0}", l.getSrcFolder()), e);
+              showWarning(tr("Error"), format("Unable to list header files in {0}", l.getSrcFolder()), e);
             }
           }
         };
@@ -1255,7 +1258,7 @@ public class Base {
     if (!platformLibs.isEmpty()) {
       menu.addSeparator();
       platformLibs.sort();
-      label = new JMenuItem(I18n.format(tr("Examples for {0}"), boardId));
+      label = new JMenuItem(format(tr("Examples for {0}"), boardId));
       label.setEnabled(false);
       menu.add(label);
       for (UserLibrary lib : platformLibs) {
@@ -1266,7 +1269,7 @@ public class Base {
     if (!referencedPlatformLibs.isEmpty()) {
       menu.addSeparator();
       referencedPlatformLibs.sort();
-      label = new JMenuItem(I18n.format(tr("Examples for {0}"), referencedPlatformName));
+      label = new JMenuItem(format(tr("Examples for {0}"), referencedPlatformName));
       label.setEnabled(false);
       menu.add(label);
       for (UserLibrary lib : referencedPlatformLibs) {
@@ -1288,6 +1291,7 @@ public class Base {
     if (!sketchbookIncompatibleLibs.isEmpty()) {
       sketchbookIncompatibleLibs.sort();
       JMenu incompatible = new JMenu(tr("INCOMPATIBLE"));
+      MenuScroller.setScrollerFor(incompatible);
       menu.add(incompatible);
       for (UserLibrary lib : sketchbookIncompatibleLibs) {
         addSketchesSubmenu(incompatible, lib);
@@ -1687,19 +1691,12 @@ public class Base {
     });
 
     boolean ifound = false;
-
     for (File subfolder : files) {
-      if (FileUtils.isSCCSOrHiddenFile(subfolder)) {
-        continue;
-      }
-
-      if (!subfolder.isDirectory()) continue;
-
-      if (addSketchesSubmenu(menu, subfolder.getName(), subfolder)) {
+      if (!FileUtils.isSCCSOrHiddenFile(subfolder) && subfolder.isDirectory()
+          && addSketchesSubmenu(menu, subfolder.getName(), subfolder)) {
         ifound = true;
       }
     }
-
     return ifound;
   }
 
@@ -1784,7 +1781,7 @@ public class Base {
           try {
             activeEditor.getSketchController().importLibrary(l);
           } catch (IOException e) {
-            showWarning(tr("Error"), I18n.format("Unable to list header files in {0}", l.getSrcFolder()), e);
+            showWarning(tr("Error"), format("Unable to list header files in {0}", l.getSrcFolder()), e);
           }
         }
       };
@@ -1873,6 +1870,81 @@ public class Base {
     getEditors().forEach(Editor::applyPreferences);
   }
 
+  private MouseWheelListener editorFontResizeMouseWheelListener = null;
+  private KeyListener editorFontResizeKeyListener = null;
+
+  /**
+   * Adds a {@link MouseWheelListener} and {@link KeyListener} to the given
+   * component that will make "CTRL scroll" and "CTRL +/-"
+   * (with optional SHIFT for +) increase/decrease the editor text size.
+   * This method is equivalent to calling
+   * {@link #addEditorFontResizeMouseWheelListener(Component)} and
+   * {@link #addEditorFontResizeKeyListener(Component)} on the given component.
+   * Note that this also affects components that use the editor font settings.
+   * @param comp - The component to add the listener to.
+   */
+  public void addEditorFontResizeListeners(Component comp) {
+    this.addEditorFontResizeMouseWheelListener(comp);
+    this.addEditorFontResizeKeyListener(comp);
+  }
+
+  /**
+   * Adds a {@link MouseWheelListener} to the given component that will
+   * make "CTRL scroll" increase/decrease the editor text size.
+   * When CTRL is not pressed while scrolling, mouse wheel events are passed
+   * on to the parent of the given component.
+   * Note that this also affects components that use the editor font settings.
+   * @param comp - The component to add the listener to.
+   */
+  public void addEditorFontResizeMouseWheelListener(Component comp) {
+    if (this.editorFontResizeMouseWheelListener == null) {
+      this.editorFontResizeMouseWheelListener = (MouseWheelEvent e) -> {
+        if (e.isControlDown()) {
+          if (e.getWheelRotation() < 0) {
+            this.handleFontSizeChange(1);
+          } else {
+            this.handleFontSizeChange(-1);
+          }
+        } else {
+          e.getComponent().getParent().dispatchEvent(e);
+        }
+      };
+    }
+    comp.addMouseWheelListener(this.editorFontResizeMouseWheelListener);
+  }
+
+  /**
+   * Adds a {@link KeyListener} to the given component that will make "CTRL +/-"
+   * (with optional SHIFT for +) increase/decrease the editor text size.
+   * Note that this also affects components that use the editor font settings.
+   * @param comp - The component to add the listener to.
+   */
+  public void addEditorFontResizeKeyListener(Component comp) {
+    if (this.editorFontResizeKeyListener == null) {
+      this.editorFontResizeKeyListener = new KeyAdapter() {
+        @Override
+        public void keyPressed(KeyEvent e) {
+          if (e.getModifiersEx() == KeyEvent.CTRL_DOWN_MASK
+              || e.getModifiersEx() == (KeyEvent.CTRL_DOWN_MASK
+                  | KeyEvent.SHIFT_DOWN_MASK)) {
+            switch (e.getKeyCode()) {
+              case KeyEvent.VK_PLUS:
+              case KeyEvent.VK_EQUALS:
+                Base.this.handleFontSizeChange(1);
+                break;
+              case KeyEvent.VK_MINUS:
+                if (!e.isShiftDown()) {
+                  Base.this.handleFontSizeChange(-1);
+                }
+                break;
+            }
+          }
+        }
+      };
+    }
+    comp.addKeyListener(this.editorFontResizeKeyListener);
+  }
+
   public List<JMenu> getBoardsCustomMenus() {
     return boardsCustomMenus;
   }
@@ -1934,10 +2006,9 @@ public class Base {
   static public void openURL(String url) {
     try {
       BaseNoGui.getPlatform().openURL(url);
-
     } catch (Exception e) {
       showWarning(tr("Problem Opening URL"),
-              I18n.format(tr("Could not open the URL\n{0}"), url), e);
+                  format(tr("Could not open the URL\n{0}"), url), e);
     }
   }
 
@@ -1959,10 +2030,9 @@ public class Base {
   static public void openFolder(File file) {
     try {
       BaseNoGui.getPlatform().openFolder(file);
-
     } catch (Exception e) {
       showWarning(tr("Problem Opening Folder"),
-              I18n.format(tr("Could not open the folder\n{0}"), file.getAbsolutePath()), e);
+                  format(tr("Could not open the folder\n{0}"), file.getAbsolutePath()), e);
     }
   }
 
@@ -2040,7 +2110,7 @@ public class Base {
     if(referenceFile.exists()){
       openURL(referenceFile.getAbsolutePath());
     }else{
-      showWarning(tr("Problem Opening URL"), I18n.format(tr("Could not open the URL\n{0}"), referenceFile), null);
+      showWarning(tr("Problem Opening URL"), format(tr("Could not open the URL\n{0}"), referenceFile), null);
     }
   }
 
@@ -2296,7 +2366,7 @@ public class Base {
 
       String libName = libFolder.getName();
       if (!BaseNoGui.isSanitaryName(libName)) {
-        String mess = I18n.format(tr("The library \"{0}\" cannot be used.\n"
+        String mess = format(tr("The library \"{0}\" cannot be used.\n"
                         + "Library names must contain only basic letters and numbers.\n"
                         + "(ASCII only and no spaces, and it cannot start with a number)"),
                 libName);
@@ -2320,7 +2390,7 @@ public class Base {
       // copy folder
       File destinationFolder = new File(BaseNoGui.getSketchbookLibrariesFolder().folder, sourceFile.getName());
       if (!destinationFolder.mkdir()) {
-        activeEditor.statusError(I18n.format(tr("A library named {0} already exists"), sourceFile.getName()));
+        activeEditor.statusError(format(tr("A library named {0} already exists"), sourceFile.getName()));
         return;
       }
       try {

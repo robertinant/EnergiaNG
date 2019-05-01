@@ -24,19 +24,20 @@
  * invalidate any other reasons why the executable file might be covered by
  * the GNU General Public License.
  *
- * Copyright 2015 Arduino LLC (http://www.arduino.cc/)
+ * Copyright 2018 Arduino SA (http://www.arduino.cc/)
  */
 
-package processing.app.helpers;
+package cc.arduino.packages.discoverers;
 
-import org.junit.Test;
+public class PluggableDiscoveryMessage {
+  private String eventType; // "add", "remove", "error"
+  private String message; // optional message, e.g. "START_SYNC not supported"
 
-import static org.junit.Assert.assertEquals;
+  public String getEventType() {
+    return eventType;
+  }
 
-public class StringUtilsTest {
-
-  @Test
-  public void shouldJoinAnArray() {
-    assertEquals("1 - 2 - 3", StringUtils.join(new String[]{"1", "2", "3"}, " - "));
+  public String getMessage() {
+    return message;
   }
 }

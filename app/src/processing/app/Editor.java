@@ -35,7 +35,6 @@ import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
@@ -53,7 +52,6 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -83,6 +81,8 @@ import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.text.BadLocationException;
 
+import org.fife.ui.rsyntaxtextarea.folding.FoldManager;
+
 import com.jcraft.jsch.JSchException;
 
 import cc.arduino.CompilerProgressListener;
@@ -95,6 +95,7 @@ import cc.arduino.view.StubMenuListener;
 import cc.arduino.view.findreplace.FindReplace;
 import jssc.SerialPortException;
 import processing.app.debug.RunnerException;
+import processing.app.debug.TargetBoard;
 import processing.app.forms.PasswordAuthorizationDialog;
 import processing.app.helpers.DocumentTextChangeListener;
 import processing.app.helpers.Keys;
@@ -133,16 +134,20 @@ public class Editor extends JFrame implements RunnerListener {
     }
   }
 
-  private static class ShouldSaveReadOnly implements Predicate<SketchController> {
+  private static class CanExportInSketchFolder
+      implements Predicate<SketchController> {
 
     @Override
-    public boolean test(SketchController sketch) {
-      return sketch.isReadOnly();
+    public boolean test(SketchController controller) {
+      if (controller.isReadOnly()) {
+        return false;
+      }
+      if (controller.getSketch().isModified()) {
+        return PreferencesData.getBoolean("editor.save_on_verify");
+      }
+      return true;
     }
   }
-
-  private final static List<String> BOARD_PROTOCOLS_ORDER = Arrays.asList("serial", "network");
-  private final static List<String> BOARD_PROTOCOLS_ORDER_TRANSLATIONS = Arrays.asList(tr("Serial ports"), tr("Network ports"));
 
   final Base base;
 
@@ -226,8 +231,8 @@ public class Editor extends JFrame implements RunnerListener {
   Runnable presentHandler;
   private Runnable runAndSaveHandler;
   private Runnable presentAndSaveHandler;
-  Runnable exportHandler;
-  private Runnable exportAppHandler;
+  private UploadHandler uploadHandler;
+  private UploadHandler uploadUsingProgrammerHandler;
   private Runnable timeoutUploadHandler;
 
   private Map<String, Tool> internalToolCache = new HashMap<String, Tool>();
@@ -310,7 +315,7 @@ public class Editor extends JFrame implements RunnerListener {
     status = new EditorStatus(this);
     consolePanel.add(status, BorderLayout.NORTH);
 
-    console = new EditorConsole();
+    console = new EditorConsole(base);
     console.setName("console");
     // windows puts an ugly border on this guy
     console.setBorder(null);
@@ -490,6 +495,9 @@ public class Editor extends JFrame implements RunnerListener {
       tab.applyPreferences();
     }
     console.applyPreferences();
+    if (serialMonitor != null) {
+      serialMonitor.applyPreferences();
+    }
   }
 
 
@@ -666,11 +674,12 @@ public class Editor extends JFrame implements RunnerListener {
 
     item = newJMenuItemAlt(tr("Export compiled Binary"), 'S');
     item.addActionListener(event -> {
-      if (new ShouldSaveReadOnly().test(sketchController) && !handleSave(true)) {
+      if (!(new CanExportInSketchFolder().test(sketchController))) {
         System.out.println(tr("Export canceled, changes must first be saved."));
         return;
       }
-      handleRun(false, new ShouldSaveReadOnly(), presentAndSaveHandler, runAndSaveHandler);
+      handleRun(false, new CanExportInSketchFolder(), presentAndSaveHandler, runAndSaveHandler);
+
     });
     sketchMenu.add(item);
 
@@ -982,21 +991,6 @@ public class Editor extends JFrame implements RunnerListener {
   }
 
 
-  class SerialMenuListener implements ActionListener {
-
-    private final String serialPort;
-
-    public SerialMenuListener(String serialPort) {
-      this.serialPort = serialPort;
-    }
-
-    public void actionPerformed(ActionEvent e) {
-      selectSerialPort(serialPort);
-      base.onBoardOrPortChange();
-    }
-
-  }
-
   private void selectSerialPort(String name) {
     if(portMenu == null) {
       System.out.println(tr("serialMenu is null"));
@@ -1044,8 +1038,34 @@ public class Editor extends JFrame implements RunnerListener {
     //System.out.println("set to " + get("serial.port"));
   }
 
+  class BoardPortJCheckBoxMenuItem extends JCheckBoxMenuItem {
+    private BoardPort port;
+
+    public BoardPortJCheckBoxMenuItem(BoardPort port) {
+      super();
+      this.port = port;
+      setText(toString());
+      addActionListener(e -> {
+        selectSerialPort(port.getAddress());
+        base.onBoardOrPortChange();
+      });
+    }
+
+    @Override
+    public String toString() {
+      // This is required for serialPrompt()
+      String label = port.getLabel();
+      if (port.getBoardName() != null && !port.getBoardName().isEmpty()) {
+        label += " (" + port.getBoardName() + ")";
+      }
+      return label;
+    }
+  }
 
   private void populatePortMenu() {
+    final List<String> PROTOCOLS_ORDER = Arrays.asList("serial", "network");
+    final List<String> PROTOCOLS_LABELS = Arrays.asList(tr("Serial ports"), tr("Network ports"));
+
     portMenu.removeAll();
 
     String selectedPort = PreferencesData.get("serial.port");
@@ -1054,36 +1074,48 @@ public class Editor extends JFrame implements RunnerListener {
 
     ports = platform.filterPorts(ports, PreferencesData.getBoolean("serial.ports.showall"));
 
-    Collections.sort(ports, new Comparator<BoardPort>() {
-      @Override
-      public int compare(BoardPort o1, BoardPort o2) {
-        return BOARD_PROTOCOLS_ORDER.indexOf(o1.getProtocol()) - BOARD_PROTOCOLS_ORDER.indexOf(o2.getProtocol());
-      }
+    ports.stream() //
+        .filter(port -> port.getProtocolLabel() == null || port.getProtocolLabel().isEmpty())
+        .forEach(port -> {
+          int labelIdx = PROTOCOLS_ORDER.indexOf(port.getProtocol());
+          if (labelIdx != -1) {
+            port.setProtocolLabel(PROTOCOLS_LABELS.get(labelIdx));
+          } else {
+            port.setProtocolLabel(port.getProtocol());
+          }
+        });
+
+    Collections.sort(ports, (port1, port2) -> {
+      String pr1 = port1.getProtocol();
+      String pr2 = port2.getProtocol();
+      int prIdx1 = PROTOCOLS_ORDER.contains(pr1) ? PROTOCOLS_ORDER.indexOf(pr1) : 999;
+      int prIdx2 = PROTOCOLS_ORDER.contains(pr2) ? PROTOCOLS_ORDER.indexOf(pr2) : 999;
+      int r = prIdx1 - prIdx2;
+      if (r != 0)
+        return r;
+      r = port1.getProtocolLabel().compareTo(port2.getProtocolLabel());
+      if (r != 0)
+        return r;
+      return port1.getAddress().compareTo(port2.getAddress());
     });
 
-    String lastProtocol = null;
-    String lastProtocolTranslated;
+    String lastProtocol = "";
+    String lastProtocolLabel = "";
     for (BoardPort port : ports) {
-      if (lastProtocol == null || !port.getProtocol().equals(lastProtocol)) {
-        if (lastProtocol != null) {
+      if (!port.getProtocol().equals(lastProtocol) || !port.getProtocolLabel().equals(lastProtocolLabel)) {
+        if (!lastProtocol.isEmpty()) {
           portMenu.addSeparator();
         }
         lastProtocol = port.getProtocol();
-
-        if (BOARD_PROTOCOLS_ORDER.indexOf(port.getProtocol()) != -1) {
-          lastProtocolTranslated = BOARD_PROTOCOLS_ORDER_TRANSLATIONS.get(BOARD_PROTOCOLS_ORDER.indexOf(port.getProtocol()));
-        } else {
-          lastProtocolTranslated = port.getProtocol();
-        }
-        JMenuItem lastProtocolMenuItem = new JMenuItem(tr(lastProtocolTranslated));
-        lastProtocolMenuItem.setEnabled(false);
-        portMenu.add(lastProtocolMenuItem);
+        lastProtocolLabel = port.getProtocolLabel();
+        JMenuItem item = new JMenuItem(tr(lastProtocolLabel));
+        item.setEnabled(false);
+        portMenu.add(item);
       }
       String address = port.getAddress();
-      String label = port.getLabel();
 
-      JCheckBoxMenuItem item = new JCheckBoxMenuItem(label, address.equals(selectedPort));
-      item.addActionListener(new SerialMenuListener(address));
+      BoardPortJCheckBoxMenuItem item = new BoardPortJCheckBoxMenuItem(port);
+      item.setSelected(address.equals(selectedPort));
       portMenu.add(item);
     }
 
@@ -1241,12 +1273,14 @@ public class Editor extends JFrame implements RunnerListener {
     JMenuItem increaseFontSizeItem = newJMenuItem(tr("Increase Font Size"), KeyEvent.VK_PLUS);
     increaseFontSizeItem.addActionListener(event -> base.handleFontSizeChange(1));
     menu.add(increaseFontSizeItem);
-    // Add alternative shortcut "CTRL SHIFT =" for keyboards that haven't the "+" key
-    // in the base layer. This workaround covers all the keyboards that have the "+"
-    // key available as "SHIFT =" that seems to be very common.
+    // Many keyboards have '+' and '=' on the same key. Allowing "CTRL +",
+    // "CTRL SHIFT +" and "CTRL =" covers the generally expected behavior.
     KeyStroke ctrlShiftEq = KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, SHORTCUT_KEY_MASK | ActionEvent.SHIFT_MASK);
     menu.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(ctrlShiftEq, "IncreaseFontSize");
+    KeyStroke ctrlEq = KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, SHORTCUT_KEY_MASK);
+    menu.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(ctrlEq, "IncreaseFontSize");
     menu.getActionMap().put("IncreaseFontSize", new AbstractAction() {
+      @Override
       public void actionPerformed(ActionEvent e) {
         base.handleFontSizeChange(1);
       }
@@ -1376,8 +1410,10 @@ public class Editor extends JFrame implements RunnerListener {
     presentHandler = new BuildHandler(true);
     runAndSaveHandler = new BuildHandler(false, true);
     presentAndSaveHandler = new BuildHandler(true, true);
-    exportHandler = new DefaultExportHandler();
-    exportAppHandler = new DefaultExportAppHandler();
+    uploadHandler = new UploadHandler();
+    uploadHandler.setUsingProgrammer(false);
+    uploadUsingProgrammerHandler = new UploadHandler();
+    uploadUsingProgrammerHandler.setUsingProgrammer(true);
     timeoutUploadHandler = new TimeoutUploadHandler();
   }
 
@@ -1636,8 +1672,17 @@ public class Editor extends JFrame implements RunnerListener {
   }
 
   public void addLineHighlight(int line) throws BadLocationException {
-    getCurrentTab().getTextArea().addLineHighlight(line, new Color(1, 0, 0, 0.2f));
-    getCurrentTab().getTextArea().setCaretPosition(getCurrentTab().getTextArea().getLineStartOffset(line));
+    SketchTextArea textArea = getCurrentTab().getTextArea();
+    FoldManager foldManager = textArea.getFoldManager();
+    if (foldManager.isLineHidden(line)) {
+      for (int i = 0; i < foldManager.getFoldCount(); i++) {
+        if (foldManager.getFold(i).containsLine(line)) {
+          foldManager.getFold(i).setCollapsed(false);
+        }
+      }
+    }
+    textArea.addLineHighlight(line, new Color(1, 0, 0, 0.2f));
+    textArea.setCaretPosition(textArea.getLineStartOffset(line));
   }
 
 
@@ -1953,31 +1998,29 @@ public class Editor extends JFrame implements RunnerListener {
 
 
   private boolean serialPrompt() {
-    int count = portMenu.getItemCount();
-    Object[] names = new Object[count];
-    for (int i = 0; i < count; i++) {
-      names[i] = portMenu.getItem(i).getText();
+    List<BoardPortJCheckBoxMenuItem> items = new ArrayList<>();
+    for (int i = 0; i < portMenu.getItemCount(); i++) {
+      if (portMenu.getItem(i) instanceof BoardPortJCheckBoxMenuItem)
+        items.add((BoardPortJCheckBoxMenuItem) portMenu.getItem(i));
     }
 
-    // FIXME: This is horribly unreadable
-    String result = (String)
-    JOptionPane.showInputDialog(this,
-     I18n.format(
-      tr("Serial port {0} not found.\n" +
-       "Retry the upload with another serial port?"),
-      PreferencesData.get("serial.port")
-     ),
-     "Serial port not found",
-     JOptionPane.PLAIN_MESSAGE,
-     null,
-     names,
-     0);
-    if (result == null) return false;
-    selectSerialPort(result);
+    String port = PreferencesData.get("serial.port");
+    String title;
+    if (port == null || port.isEmpty()) {
+      title = tr("Serial port not selected.");
+    } else {
+      title = I18n.format(tr("Serial port {0} not found."), port);
+    }
+    String question = tr("Retry the upload with another serial port?");
+    BoardPortJCheckBoxMenuItem result = (BoardPortJCheckBoxMenuItem) JOptionPane
+        .showInputDialog(this, title + "\n" + question, title,
+                         JOptionPane.PLAIN_MESSAGE, null, items.toArray(), 0);
+    if (result == null)
+      return false;
+    result.doClick();
     base.onBoardOrPortChange();
     return true;
   }
-
 
   /**
    * Called by Sketch &rarr; Export.
@@ -2007,13 +2050,17 @@ public class Editor extends JFrame implements RunnerListener {
     avoidMultipleOperations = true;
 
     new Thread(timeoutUploadHandler).start();
-    new Thread(usingProgrammer ? exportAppHandler : exportHandler).start();
+    new Thread(usingProgrammer ? uploadUsingProgrammerHandler : uploadHandler).start();
   }
 
-  // DAM: in Arduino, this is upload
-  class DefaultExportHandler implements Runnable {
-    public void run() {
+  class UploadHandler implements Runnable {
+    boolean usingProgrammer = false;
 
+    public void setUsingProgrammer(boolean usingProgrammer) {
+      this.usingProgrammer = usingProgrammer;
+    }
+
+    public void run() {
       try {
         removeAllLineHighlights();
         if (serialMonitor != null) {
@@ -2025,14 +2072,20 @@ public class Editor extends JFrame implements RunnerListener {
 
         uploading = true;
 
-        boolean success = sketchController.exportApplet(false);
+        boolean success = sketchController.exportApplet(usingProgrammer);
         if (success) {
           statusNotice(tr("Done uploading."));
         }
       } catch (SerialNotFoundException e) {
-        if (portMenu.getItemCount() == 0) statusError(e);
-        else if (serialPrompt()) run();
-        else statusNotice(tr("Upload canceled."));
+        if (portMenu.getItemCount() == 0) {
+          statusError(tr("Serial port not selected."));
+        } else {
+          if (serialPrompt()) {
+            run();
+          } else {
+            statusNotice(tr("Upload canceled."));
+          }
+        }
       } catch (PreferencesMapException e) {
         statusError(I18n.format(
                     tr("Error while uploading: missing '{0}' configuration parameter"),
@@ -2108,55 +2161,6 @@ public class Editor extends JFrame implements RunnerListener {
    }
   }
 
-  // DAM: in Arduino, this is upload (with verbose output)
-  class DefaultExportAppHandler implements Runnable {
-    public void run() {
-
-      try {
-        if (serialMonitor != null) {
-          serialMonitor.suspend();
-        }
-        if (serialPlotter != null) {
-          serialPlotter.suspend();
-        }
-
-        uploading = true;
-
-        boolean success = sketchController.exportApplet(true);
-        if (success) {
-          statusNotice(tr("Done uploading."));
-        }
-      } catch (SerialNotFoundException e) {
-        if (portMenu.getItemCount() == 0) statusError(e);
-        else if (serialPrompt()) run();
-        else statusNotice(tr("Upload canceled."));
-      } catch (PreferencesMapException e) {
-        statusError(I18n.format(
-                    tr("Error while uploading: missing '{0}' configuration parameter"),
-                    e.getMessage()));
-      } catch (RunnerException e) {
-        //statusError("Error during upload.");
-        //e.printStackTrace();
-        status.unprogress();
-        statusError(e);
-      } catch (Exception e) {
-        e.printStackTrace();
-      } finally {
-        avoidMultipleOperations = false;
-        populatePortMenu();
-      }
-      status.unprogress();
-      uploading = false;
-      //toolbar.clear();
-      toolbar.deactivateExport();
-
-      resumeOrCloseSerialMonitor();
-      resumeOrCloseSerialPlotter();
-
-      base.onBoardOrPortChange();
-    }
-  }
-
   class TimeoutUploadHandler implements Runnable {
 
     public void run() {
@@ -2210,7 +2214,7 @@ public class Editor extends JFrame implements RunnerListener {
       return;
     }
 
-    serialMonitor = new MonitorFactory().newMonitor(port);
+    serialMonitor = new MonitorFactory().newMonitor(base, port);
 
     if (serialMonitor == null) {
       String board = port.getPrefs().get("board");
@@ -2388,6 +2392,8 @@ public class Editor extends JFrame implements RunnerListener {
           SwingUtilities.invokeLater(() -> statusError(tr("Error while burning bootloader.")));
           // error message will already be visible
         }
+      } catch (SerialNotFoundException e) {
+        SwingUtilities.invokeLater(() -> statusError(tr("Error while burning bootloader: please select a serial port.")));
       } catch (PreferencesMapException e) {
         SwingUtilities.invokeLater(() -> {
           statusError(I18n.format(
@@ -2419,9 +2425,9 @@ public class Editor extends JFrame implements RunnerListener {
     for (BoardPort port : ports) {
       if (port.getAddress().equals(selectedPort)) {
         label = port.getBoardName();
-        vid = port.getVID();
-        pid = port.getPID();
-        iserial = port.getISerial();
+        vid = port.getPrefs().get("vid");
+        pid = port.getPrefs().get("pid");
+        iserial = port.getPrefs().get("iserial");
         protocol = port.getProtocol();
         found = true;
         break;
@@ -2591,12 +2597,12 @@ public class Editor extends JFrame implements RunnerListener {
   // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
   protected void onBoardOrPortChange() {
-    Map<String, String> boardPreferences = BaseNoGui.getBoardPreferences();
-    if (boardPreferences != null)
-      lineStatus.setBoardName(boardPreferences.get("name"));
+    TargetBoard board = BaseNoGui.getTargetBoard();
+    if (board != null)
+      lineStatus.setBoardName(board.getName());
     else
       lineStatus.setBoardName("-");
-    lineStatus.setSerialPort(PreferencesData.get("serial.port"));
+    lineStatus.setPort(PreferencesData.get("serial.port"));
     lineStatus.repaint();
   }
 
