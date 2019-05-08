@@ -29,6 +29,7 @@
 #include <Stream.h>
 #include <Client.h>
 #include <Arduino.h>  // To get access to the Arduino millis() function
+#include <stdio.h>
 
 /******************************************************************************
  * Definitions
