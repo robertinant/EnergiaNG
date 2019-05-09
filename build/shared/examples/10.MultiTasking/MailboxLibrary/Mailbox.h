@@ -70,7 +70,7 @@ public:
     ///             Check returned bool for result.
     /// @warning    Message must be of type typename.
     ///
-    bool post(mailboxType &message, uint16_t timeout = BIOS_WAIT_FOREVER);
+    bool post(mailboxType &message, uint32_t timeout = BIOS_WAIT_FOREVER);
 
     ///
     /// @brief      Wait for a message from the mailbox
@@ -110,7 +110,7 @@ template <typename mailboxType> void Mailbox<mailboxType>::waitFor(mailboxType &
     Mailbox_pend(MailboxHandle, &message, BIOS_WAIT_FOREVER);
 }
 
-template <typename mailboxType> bool Mailbox<mailboxType>::post(mailboxType &message, uint16_t timeout)
+template <typename mailboxType> bool Mailbox<mailboxType>::post(mailboxType &message, uint32_t timeout)
 {
      return Mailbox_post(MailboxHandle, &message, timeout);
 }
