@@ -26,9 +26,11 @@ import cc.arduino.Compiler;
 import cc.arduino.Constants;
 import cc.arduino.UpdatableBoardsLibsFakeURLsHandler;
 import cc.arduino.UploaderUtils;
-import cc.arduino.packages.Uploader;
 import cc.arduino.contributions.*;
-import cc.arduino.contributions.libraries.*;
+import cc.arduino.contributions.libraries.ContributedLibrary;
+import cc.arduino.contributions.libraries.LibrariesIndexer;
+import cc.arduino.contributions.libraries.LibraryInstaller;
+import cc.arduino.contributions.libraries.LibraryOfSameTypeComparator;
 import cc.arduino.contributions.libraries.ui.LibraryManagerUI;
 import cc.arduino.contributions.packages.ContributedPlatform;
 import cc.arduino.contributions.packages.ContributionInstaller;
@@ -36,20 +38,17 @@ import cc.arduino.contributions.packages.ContributionsIndexer;
 import cc.arduino.contributions.packages.ui.ContributionManagerUI;
 import cc.arduino.files.DeleteFilesOnShutdown;
 import cc.arduino.packages.DiscoveryManager;
+import cc.arduino.packages.Uploader;
 import cc.arduino.view.Event;
 import cc.arduino.view.JMenuUtils;
 import cc.arduino.view.SplashScreenHelper;
-
+import com.github.zafarkhaja.semver.Version;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-
-import com.github.zafarkhaja.semver.Version;
-
 import processing.app.debug.TargetBoard;
 import processing.app.debug.TargetPackage;
 import processing.app.debug.TargetPlatform;
 import processing.app.helpers.*;
-import processing.app.helpers.OSUtils;
 import processing.app.helpers.filefilters.OnlyDirs;
 import processing.app.helpers.filefilters.OnlyFilesWithExtension;
 import processing.app.javax.swing.filechooser.FileNameExtensionFilter;
@@ -67,9 +66,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
-import java.util.*;
 import java.util.List;
 import java.util.Timer;
+import java.util.*;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -208,6 +207,9 @@ public class Base {
     BaseNoGui.getPlatform().init();
 
     BaseNoGui.initPortableFolder();
+    // This configure the logs root folder
+    System.out.println("Set log4j store directory " + BaseNoGui.getSettingsFolder().getAbsolutePath());
+    System.setProperty("log4j.dir", BaseNoGui.getSettingsFolder().getAbsolutePath());
 
     // Look for a possible "--preferences-file" parameter and load preferences
     BaseNoGui.initParameters(args);
@@ -286,8 +288,9 @@ public class Base {
     pdeKeywords = new PdeKeywords();
     pdeKeywords.reload();
 
-    contributionInstaller = new ContributionInstaller(BaseNoGui.getPlatform(), new GPGDetachedSignatureVerifier());
-    libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform());
+    final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
+    contributionInstaller = new ContributionInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
+    libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
 
     parser.parseArgumentsPhase2();
 
@@ -301,7 +304,7 @@ public class Base {
     if (parser.isInstallBoard()) {
       ContributionsIndexer indexer = new ContributionsIndexer(
           BaseNoGui.getSettingsFolder(), BaseNoGui.getHardwareFolder(),
-          BaseNoGui.getPlatform(), new GPGDetachedSignatureVerifier());
+          BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
       ProgressListener progressListener = new ConsoleProgressListener();
 
       List<String> downloadedPackageIndexFiles = contributionInstaller.updateIndex(progressListener);
@@ -384,7 +387,7 @@ public class Base {
                       library, mayInstalled.get().getParsedVersion())));
           libraryInstaller.remove(mayInstalled.get(), progressListener);
         } else {
-          libraryInstaller.install(selected, mayInstalled, progressListener);
+          libraryInstaller.install(selected, progressListener);
         }
       }
 
@@ -764,7 +767,20 @@ public class Base {
     if (!newbieFile.createNewFile()) {
       throw new IOException();
     }
-    FileUtils.copyFile(new File(getContentFile("examples"), "01.Basics" + File.separator + "BareMinimum" + File.separator + "BareMinimum.ino"), newbieFile);
+
+    // Initialize the pde file with the BareMinimum sketch.
+    // Apply user-defined tab settings.
+    String sketch = FileUtils.readFileToString(
+        new File(getContentFile("examples"), "01.Basics" + File.separator
+            + "BareMinimum" + File.separator + "BareMinimum.ino"));
+    String currentTab = "  ";
+    String newTab = (PreferencesData.getBoolean("editor.tabs.expand")
+        ? StringUtils.repeat(" ",
+            PreferencesData.getInteger("editor.tabs.size"))
+        : "\t");
+    sketch = sketch.replaceAll(
+        "(?<=(^|\n)(" + currentTab + "){0,50})" + currentTab, newTab);
+    FileUtils.writeStringToFile(newbieFile, sketch);
     return newbieFile;
   }
 
@@ -1436,16 +1452,15 @@ public class Base {
     boardMenu.add(new JSeparator());
 
     // Generate custom menus for all platforms
-    Set<String> customMenusTitles = new LinkedHashSet<>();
     for (TargetPackage targetPackage : BaseNoGui.packages.values()) {
       for (TargetPlatform targetPlatform : targetPackage.platforms()) {
-        customMenusTitles.addAll(targetPlatform.getCustomMenus().values());
+        for (String customMenuTitle : targetPlatform.getCustomMenus().values()) {
+          JMenu customMenu = new JMenu(tr(customMenuTitle));
+          customMenu.putClientProperty("platform", getPlatformUniqueId(targetPlatform));
+          customMenu.putClientProperty("removeOnWindowDeactivation", true);
+          boardsCustomMenus.add(customMenu);
+        }
       }
-    }
-    for (String customMenuTitle : customMenusTitles) {
-      JMenu customMenu = new JMenu(tr(customMenuTitle));
-      customMenu.putClientProperty("removeOnWindowDeactivation", true);
-      boardsCustomMenus.add(customMenu);
     }
 
     List<JMenuItem> menuItemsToClickAfterStartup = new LinkedList<>();
@@ -1495,6 +1510,10 @@ public class Base {
     }
   }
 
+  private String getPlatformUniqueId(TargetPlatform platform) {
+    return platform.getId() + "_" + platform.getFolder();
+  }
+
   private JRadioButtonMenuItem createBoardMenusAndCustomMenus(
           final List<JMenu> boardsCustomMenus, List<JMenuItem> menuItemsToClickAfterStartup,
           Map<String, ButtonGroup> buttonGroupsMap,
@@ -1532,7 +1551,7 @@ public class Base {
     PreferencesMap customMenus = targetPlatform.getCustomMenus();
     for (final String menuId : customMenus.keySet()) {
       String title = customMenus.get(menuId);
-      JMenu menu = getBoardCustomMenu(tr(title));
+      JMenu menu = getBoardCustomMenu(tr(title), getPlatformUniqueId(targetPlatform));
 
       if (board.hasMenu(menuId)) {
         PreferencesMap boardCustomMenu = board.getMenuLabels(menuId);
@@ -1540,11 +1559,16 @@ public class Base {
           @SuppressWarnings("serial")
           Action subAction = new AbstractAction(tr(boardCustomMenu.get(customMenuOption))) {
             public void actionPerformed(ActionEvent e) {
-              PreferencesData.set("custom_" + menuId, ((TargetBoard) getValue("board")).getId() + "_" + getValue("custom_menu_option"));
+              PreferencesData.set("custom_" + menuId, ((List<TargetBoard>) getValue("board")).get(0).getId() + "_" + getValue("custom_menu_option"));
               onBoardOrPortChange();
             }
           };
-          subAction.putValue("board", board);
+          List<TargetBoard> boards = (List<TargetBoard>) subAction.getValue("board");
+          if (boards == null) {
+            boards = new ArrayList<TargetBoard>();
+          }
+          boards.add(board);
+          subAction.putValue("board", boards);
           subAction.putValue("custom_menu_option", customMenuOption);
 
           if (!buttonGroupsMap.containsKey(menuId)) {
@@ -1572,7 +1596,9 @@ public class Base {
       JMenu menu = boardsCustomMenus.get(i);
       for (int m = 0; m < menu.getItemCount(); m++) {
         JMenuItem menuItem = menu.getItem(m);
-        menuItem.setVisible(menuItem.getAction().getValue("board").equals(board));
+        for (TargetBoard t_board : (List<TargetBoard>)menuItem.getAction().getValue("board")) {
+          menuItem.setVisible(t_board.equals(board));
+        }
       }
       menu.setVisible(ifThereAreVisibleItemsOn(menu));
 
@@ -1595,9 +1621,9 @@ public class Base {
     return false;
   }
 
-  private JMenu getBoardCustomMenu(String label) throws Exception {
+  private JMenu getBoardCustomMenu(String label, String platformUniqueId) throws Exception {
     for (JMenu menu : boardsCustomMenus) {
-      if (label.equals(menu.getText())) {
+      if (label.equals(menu.getText()) && menu.getClientProperty("platform").equals(platformUniqueId)) {
         return menu;
       }
     }
@@ -1870,9 +1896,6 @@ public class Base {
     getEditors().forEach(Editor::applyPreferences);
   }
 
-  private MouseWheelListener editorFontResizeMouseWheelListener = null;
-  private KeyListener editorFontResizeKeyListener = null;
-
   /**
    * Adds a {@link MouseWheelListener} and {@link KeyListener} to the given
    * component that will make "CTRL scroll" and "CTRL +/-"
@@ -1884,8 +1907,8 @@ public class Base {
    * @param comp - The component to add the listener to.
    */
   public void addEditorFontResizeListeners(Component comp) {
-    this.addEditorFontResizeMouseWheelListener(comp);
-    this.addEditorFontResizeKeyListener(comp);
+    addEditorFontResizeMouseWheelListener(comp);
+    addEditorFontResizeKeyListener(comp);
   }
 
   /**
@@ -1897,20 +1920,19 @@ public class Base {
    * @param comp - The component to add the listener to.
    */
   public void addEditorFontResizeMouseWheelListener(Component comp) {
-    if (this.editorFontResizeMouseWheelListener == null) {
-      this.editorFontResizeMouseWheelListener = (MouseWheelEvent e) -> {
-        if (e.isControlDown()) {
-          if (e.getWheelRotation() < 0) {
-            this.handleFontSizeChange(1);
-          } else {
-            this.handleFontSizeChange(-1);
-          }
+    comp.addMouseWheelListener(e -> {
+      if (e.isControlDown()) {
+        if (e.getWheelRotation() < 0) {
+          this.handleFontSizeChange(1);
         } else {
+          this.handleFontSizeChange(-1);
+        }
+      } else {
+        if (e.getComponent() != null && e.getComponent().getParent() != null) {
           e.getComponent().getParent().dispatchEvent(e);
         }
-      };
-    }
-    comp.addMouseWheelListener(this.editorFontResizeMouseWheelListener);
+      }
+    });
   }
 
   /**
@@ -1920,29 +1942,26 @@ public class Base {
    * @param comp - The component to add the listener to.
    */
   public void addEditorFontResizeKeyListener(Component comp) {
-    if (this.editorFontResizeKeyListener == null) {
-      this.editorFontResizeKeyListener = new KeyAdapter() {
-        @Override
-        public void keyPressed(KeyEvent e) {
-          if (e.getModifiersEx() == KeyEvent.CTRL_DOWN_MASK
-              || e.getModifiersEx() == (KeyEvent.CTRL_DOWN_MASK
-                  | KeyEvent.SHIFT_DOWN_MASK)) {
-            switch (e.getKeyCode()) {
-              case KeyEvent.VK_PLUS:
-              case KeyEvent.VK_EQUALS:
-                Base.this.handleFontSizeChange(1);
-                break;
-              case KeyEvent.VK_MINUS:
-                if (!e.isShiftDown()) {
-                  Base.this.handleFontSizeChange(-1);
-                }
-                break;
+    comp.addKeyListener(new KeyAdapter() {
+      @Override
+      public void keyPressed(KeyEvent e) {
+        if (e.getModifiersEx() == KeyEvent.CTRL_DOWN_MASK
+            || e.getModifiersEx() == (KeyEvent.CTRL_DOWN_MASK
+                                      | KeyEvent.SHIFT_DOWN_MASK)) {
+          switch (e.getKeyCode()) {
+          case KeyEvent.VK_PLUS:
+          case KeyEvent.VK_EQUALS:
+            Base.this.handleFontSizeChange(1);
+            break;
+          case KeyEvent.VK_MINUS:
+            if (!e.isShiftDown()) {
+              Base.this.handleFontSizeChange(-1);
             }
+            break;
           }
         }
-      };
-    }
-    comp.addKeyListener(this.editorFontResizeKeyListener);
+      }
+    });
   }
 
   public List<JMenu> getBoardsCustomMenus() {

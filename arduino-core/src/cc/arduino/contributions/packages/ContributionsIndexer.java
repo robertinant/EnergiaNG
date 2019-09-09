@@ -31,14 +31,14 @@ package cc.arduino.contributions.packages;
 
 import cc.arduino.Constants;
 import cc.arduino.contributions.DownloadableContribution;
-import cc.arduino.contributions.SignatureVerificationFailedException;
 import cc.arduino.contributions.SignatureVerifier;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.mrbean.MrBeanModule;
 import org.apache.commons.compress.utils.IOUtils;
+
+import processing.app.BaseNoGui;
 import processing.app.Platform;
 import processing.app.PreferencesData;
 import processing.app.debug.TargetPackage;
@@ -87,11 +87,21 @@ public class ContributionsIndexer {
     File defaultIndexFile = getIndexFile(Constants.DEFAULT_INDEX_FILE_NAME);
     if (defaultIndexFile.exists()) {
       // Check main index signature
-      if (!PreferencesData.getBoolean("allow_insecure_packages") && !signatureVerifier.isSigned(defaultIndexFile)) {
-        throw new SignatureVerificationFailedException(Constants.DEFAULT_INDEX_FILE_NAME);
+      if (signatureVerifier.isSigned(defaultIndexFile)) {
+        mergeContributions(defaultIndexFile);
+      } else if (PreferencesData.areInsecurePackagesAllowed()) {
+        System.err.println(format(tr("Warning: forced trusting untrusted contributions")));
+        mergeContributions(defaultIndexFile);
+      } else {
+        BaseNoGui
+            .showWarning(Constants.DEFAULT_INDEX_FILE_NAME,
+                              tr("A package index has an invalid signature and needs to be updated.\n"
+                                 + "Please open the Board Manager from the menu\n"
+                                 + "\n" //
+                                 + "      Tools -> Board -> Board Manager\n"
+                                 + "\nto update it"),
+                              null);
       }
-
-      mergeContributions(defaultIndexFile);
     }
 
     // Set main and bundled indexes as trusted
@@ -143,7 +153,7 @@ public class ContributionsIndexer {
 
     ContributionsIndex contributionsIndex = parseIndex(indexFile);
     boolean signed = signatureVerifier.isSigned(indexFile);
-    boolean trustall = PreferencesData.getBoolean(Constants.PREF_CONTRIBUTIONS_TRUST_ALL);
+    boolean trustall = PreferencesData.areInsecurePackagesAllowed();
 
     for (ContributedPackage contributedPackage : contributionsIndex.getPackages()) {
       contributedPackage.setTrusted(signed || trustall);
@@ -215,7 +225,7 @@ public class ContributionsIndexer {
   }
 
   private void syncBuiltInHardware() throws IOException {
-    if (index == null) {
+    if (index == null || builtInHardwareFolder == null) {
       return;
     }
     for (File folder : builtInHardwareFolder.listFiles(ONLY_DIRS)) {

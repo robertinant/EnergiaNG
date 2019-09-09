@@ -1,7 +1,7 @@
 /*
  * This file is part of Arduino.
  *
- * Copyright 2015 Arduino LLC (http://www.arduino.cc/)
+ * Copyright 2014 Arduino LLC (http://www.arduino.cc/)
  *
  * Arduino is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,20 +27,16 @@
  * the GNU General Public License.
  */
 
-package cc.arduino.contributions;
+package cc.arduino.contributions.libraries;
 
-import processing.app.I18n;
+public abstract class ContributedLibraryDependency {
 
-import static processing.app.I18n.tr;
+  public abstract String getName();
 
-@SuppressWarnings("serial")
-public class SignatureVerificationFailedException extends Exception {
+  public abstract String getVersion();
 
-  public SignatureVerificationFailedException(String filename) {
-    super(I18n.format(tr("{0} file signature verification failed"), filename));
-  }
-
-  public SignatureVerificationFailedException(String filename, Throwable cause) {
-    super(I18n.format(tr("{0} file signature verification failed"), filename), cause);
+  @Override
+  public String toString() {
+    return getName() + " " + getVersion();
   }
 }
