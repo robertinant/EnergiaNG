@@ -97,14 +97,14 @@
 
   <property name="portable" value="false" />
 
-  <property name="ARDUINO-BUILDER-VERSION" value="1.4.4" />
+  <property name="ARDUINO-BUILDER-VERSION" value="1.4.7" />
   <property name="LIBLISTSERIAL-VERSION" value="1.4.2" />
   <property name="AVRGCC-VERSION" value="4.9.2-atmel3.5.4-arduino2" />
   <property name="AVRDUDE-VERSION" value="6.3.0-arduino9" />
   <property name="arduinoOTA-VERSION" value="1.1.1" />
   <property name="MSPGCC-VERSION" value="4.6.6" />
   <property name="MSPDEBUG-VERSION" value="0.24" />
-  <property name="DSLITE-VERSION" value="8.2.0.1400" />
+  <property name="DSLITE-VERSION" value="9.1.0.1655" />
   <property name="MSP430-CORE-VERSION" value="1.0.5" />
 
   <!-- Libraries required for running arduino -->
@@ -397,13 +397,15 @@
             mainclassname="processing.app.Base"
             copyright="Energia"
             applicationCategory="public.app-category.education"
-            minimumsystemversion="10.7"
+            minimumsystemversion="10.8"
             highresolutioncapable="true">
 
-      <runtime dir="${MACOSX_BUNDLED_JVM}">
+      <runtime dir="${MACOSX_BUNDLED_JVM}"/>
+<!--
+      <runtime dir="/Library/Java/JavaVirtualMachines/jdk1.8.0_111.jdk">
         <include name="jre/bin/"/>
       </runtime>
-
+-->
       <arch name="x86_64"/>
       <arch name="i386"/>
 
@@ -414,8 +416,7 @@
       <option value="-Dcom.apple.smallTabs=true"/>
       <option value="-DAPP_DIR=$APP_ROOT/Contents/Java"/>
       <option value="-Djava.ext.dirs=$JVM_RUNTIME/Contents/Home/lib/ext/:$JVM_RUNTIME/Contents/Home/jre/lib/ext/"/>
-
-
+      <option value="-Djava.net.preferIPv4Stack=true"/>
 
       <!--
       <option value="-Dapple.awt.showGrowBox=false"/>
@@ -444,12 +445,13 @@
 
     </bundleapp>
 
-     <echo message="$JVM_RUNTIME/Contents/Home/jre/"/>
-     <echo message="${MACOSX_BUNDLED_JVM}"/>
+    <copy todir="${staging_folder}/work/Energia.app/Contents/PlugIns/jdk1.8.0_111.jdk/Contents/Home/jre/">
+      <fileset dir="${MACOSX_BUNDLED_JVM}" includes="bin/java"/>
+    </copy>
 
-      <copy todir="$JVM_RUNTIME/Contents/Home/jre/">
-        <fileset dir="${MACOSX_BUNDLED_JVM}" includes="bin/**"/>
-      </copy>
+    <chmod perm="ugo+x">
+        <fileset dir="${staging_folder}/work/Energia.app/Contents/PlugIns/jdk1.8.0_111.jdk/Contents/Home/jre/bin/" includes="java" />
+    </chmod>
 
     <mkdir dir="${staging_folder}/work/${staging_hardware_folder}" />
 
@@ -1039,7 +1041,7 @@
       <param name="file" value="windows/work/lib/jnidispatch-4.2.2-win32-x86.dll" />
     </antcall>
 
-    <unzip src="../arduino-core/lib/jssc-2.8.0-arduino3.jar" dest="windows/work/lib">
+    <unzip src="../arduino-core/lib/jssc-2.8.0-arduino4.jar" dest="windows/work/lib">
       <patternset>
         <include name="libs/windows/jSSC-2.8_x86.dll"/>
       </patternset>
@@ -1049,7 +1051,7 @@
     <antcall target="make-file-executable">
       <param name="file" value="windows/work/lib/jSSC-2.8_x86.dll" />
     </antcall>
-    <unzip src="../arduino-core/lib/jssc-2.8.0-arduino3.jar" dest="windows/work/lib">
+    <unzip src="../arduino-core/lib/jssc-2.8.0-arduino4.jar" dest="windows/work/lib">
       <patternset>
         <include name="libs/windows/jSSC-2.8_x86_64.dll"/>
       </patternset>
