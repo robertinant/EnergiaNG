@@ -41,10 +41,10 @@ import static processing.app.helpers.filefilters.OnlyDirs.ONLY_DIRS;
 public class BaseNoGui {
 
   /** Version string to be used for build */
-  public static final int REVISION = 10810;
+  public static final int REVISION = 10811;
   public static final int EREVISION = 22;
   /** Extended version string displayed on GUI */
-  public static final String VERSION_NAME = "1.8.10";
+  public static final String VERSION_NAME = "1.8.11";
   public static final String EVERSION_NAME = "22";
   public static final String VERSION_NAME_LONG;
   public static final String EVERSION_NAME_LONG;
