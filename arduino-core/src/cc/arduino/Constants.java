@@ -88,8 +88,8 @@ public class Constants {
         LIBRARY_INDEX_URL_GZ = "";
       }
     } else {
-      LIBRARY_INDEX_URL = "http://www.energia.nu/libraries/library_index.json";
-      LIBRARY_INDEX_URL_GZ = "http://www.energia.nu/libraries/library_index.json.gz";
+      LIBRARY_INDEX_URL = "http://energia.nu/libraries/library_index.json";
+      LIBRARY_INDEX_URL_GZ = "http://energia.nu/libraries/library_index.json.gz";
     }
   }
 
