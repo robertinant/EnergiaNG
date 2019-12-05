@@ -3,21 +3,12 @@ package cc.arduino.contributions.libraries.ui;
 import static processing.app.I18n.format;
 import static processing.app.I18n.tr;
 
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.Insets;
+import java.awt.*;
 import java.util.Optional;
 
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTable;
-import javax.swing.JTextPane;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.text.Document;
 import javax.swing.text.html.HTMLDocument;
@@ -42,6 +33,7 @@ public class ContributedLibraryTableCellJPanel extends JPanel {
   final JPanel buttonsPanel;
   final JPanel inactiveButtonsPanel;
   final JLabel statusLabel;
+  final JTextPane description;
   private final String moreInfoLbl = tr("More info");
 
   public ContributedLibraryTableCellJPanel(JTable parentTable, Object value,
@@ -77,7 +69,8 @@ public class ContributedLibraryTableCellJPanel extends JPanel {
     versionToInstallChooser
         .setMinimumSize(new Dimension((int)versionToInstallChooser.getPreferredSize().getWidth() + 50, (int)versionToInstallChooser.getPreferredSize().getHeight()));
 
-    makeNewDescription();
+    description = makeNewDescription();
+    add(description);
 
     buttonsPanel = new JPanel();
     buttonsPanel.setLayout(new BoxLayout(buttonsPanel, BoxLayout.X_AXIS));
@@ -121,13 +114,15 @@ public class ContributedLibraryTableCellJPanel extends JPanel {
     add(Box.createVerticalStrut(15));
 
     ContributedLibraryReleases releases = (ContributedLibraryReleases) value;
-    JTextPane description = makeNewDescription();
 
     // FIXME: happens on macosx, don't know why
     if (releases == null)
       return;
 
     ContributedLibrary selected = releases.getSelected();
+    TitledBorder titledBorder = BorderFactory.createTitledBorder(selected.getName());
+    titledBorder.setTitleFont(getFont().deriveFont(Font.BOLD));
+    setBorder(titledBorder);
     Optional<ContributedLibrary> mayInstalled = releases.getInstalled();
 
     boolean installable, upgradable;
@@ -162,7 +157,7 @@ public class ContributedLibraryTableCellJPanel extends JPanel {
     String desc = "<html><body>";
 
     // Library name...
-    desc += format("<b>{0}</b>", name);
+//    desc += format("<b>{0}</b>", name);
     if (mayInstalled.isPresent() && mayInstalled.get().isIDEBuiltIn()) {
       desc += " Built-In ";
     }
@@ -205,7 +200,6 @@ public class ContributedLibraryTableCellJPanel extends JPanel {
     description.setText(desc);
     // copy description to accessibility context for screen readers to use
     description.getAccessibleContext().setAccessibleDescription(desc);
-    description.setBackground(Color.WHITE);
 
     // for modelToView to work, the text area has to be sized. It doesn't
     // matter if it's visible or not.
@@ -215,14 +209,6 @@ public class ContributedLibraryTableCellJPanel extends JPanel {
     InstallerTableCell
         .setJTextPaneDimensionToFitContainedText(description,
                                                  parentTable.getBounds().width);
-
-    if (isSelected) {
-      setBackground(parentTable.getSelectionBackground());
-      setForeground(parentTable.getSelectionForeground());
-    } else {
-      setBackground(parentTable.getBackground());
-      setForeground(parentTable.getForeground());
-    }
   }
 
   // same function as in ContributedPlatformTableCellJPanel - is there a utils file this can move to?
@@ -246,9 +232,6 @@ public class ContributedLibraryTableCellJPanel extends JPanel {
 
   // TODO Make this a method of Theme
   private JTextPane makeNewDescription() {
-    if (getComponentCount() > 0) {
-      remove(0);
-    }
     JTextPane description = new JTextPane();
     description.setInheritsPopupMenu(true);
     Insets margin = description.getMargin();
@@ -274,7 +257,6 @@ public class ContributedLibraryTableCellJPanel extends JPanel {
       }
     });
     // description.addKeyListener(new DelegatingKeyListener(parentTable));
-    add(description, 0);
     return description;
   }
 
@@ -282,5 +264,12 @@ public class ContributedLibraryTableCellJPanel extends JPanel {
     installButton.setEnabled(enabled);
     buttonsPanel.setVisible(enabled);
     inactiveButtonsPanel.setVisible(!enabled);
+  }
+
+  public void setForeground(Color c) {
+    super.setForeground(c);
+    // The description is not opaque, so copy our foreground color to it.
+    if (description != null)
+      description.setForeground(c);
   }
 }
