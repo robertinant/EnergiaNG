@@ -104,8 +104,8 @@
   <property name="arduinoOTA-VERSION" value="1.1.1" />
   <property name="MSPGCC-VERSION" value="4.6.6" />
   <property name="MSPDEBUG-VERSION" value="0.24" />
-  <property name="DSLITE-VERSION" value="9.1.0.1655" />
-  <property name="MSP430-CORE-VERSION" value="1.0.5" />
+  <property name="DSLITE-VERSION" value="9.2.0.1793-e1" />
+  <property name="MSP430-CORE-VERSION" value="1.0.6" />
 
   <!-- Libraries required for running arduino -->
   <fileset dir=".." id="runtime.jars">

@@ -55,7 +55,7 @@ public class BoardCloudResolver {
     ObjectMapper mapper = new ObjectMapper();
     mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     try {
-      URL jsonUrl = new URL(String.format("https://builder.arduino.cc/builder/v1/boards/0x%s/0x%s", vid, pid));
+      URL jsonUrl = new URL(String.format("https://energia.nu/boards/index.php?vid=0x%s&pid=0x%s", vid, pid));
 
       final HttpURLConnection httpConnection = new HttpConnectionManager(jsonUrl)
         .makeConnection();

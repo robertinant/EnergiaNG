@@ -186,7 +186,7 @@ public class DownloadableContributionsDownloader {
       getCollection("http.signature_verify_domains");
     if (domain.size() == 0) {
       // Default domain
-      domain.add("downloads.arduino.cc");
+      domain.add("energia.nu");
     }
     if (domain.contains(url.getHost())) {
       return true;

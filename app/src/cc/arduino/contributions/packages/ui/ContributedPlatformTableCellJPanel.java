@@ -32,20 +32,11 @@ package cc.arduino.contributions.packages.ui;
 import static processing.app.I18n.format;
 import static processing.app.I18n.tr;
 
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.Insets;
+import java.awt.*;
 
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTable;
-import javax.swing.JTextPane;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.text.Document;
 import javax.swing.text.html.HTMLDocument;
@@ -75,6 +66,7 @@ public class ContributedPlatformTableCellJPanel extends JPanel {
   final JPanel buttonsPanel;
   final JPanel inactiveButtonsPanel;
   final JLabel statusLabel;
+  final JTextPane description;
   private final String moreInfoLbl = tr("More Info");
   private final String onlineHelpLbl = tr("Online Help");
 
@@ -117,7 +109,8 @@ public class ContributedPlatformTableCellJPanel extends JPanel {
     versionToInstallChooser
         .setMaximumSize(versionToInstallChooser.getPreferredSize());
 
-    makeNewDescription();
+    description = makeNewDescription();
+    add(description);
 
     buttonsPanel = new JPanel();
     buttonsPanel.setLayout(new BoxLayout(buttonsPanel, BoxLayout.X_AXIS));
@@ -184,11 +177,8 @@ public class ContributedPlatformTableCellJPanel extends JPanel {
     return retString;
   }
 
-  void update(JTable parentTable, Object value, boolean isSelected,
-              boolean hasBuiltInRelease) {
+  void update(JTable parentTable, Object value, boolean hasBuiltInRelease) {
     ContributedPlatformReleases releases = (ContributedPlatformReleases) value;
-
-    JTextPane description = makeNewDescription();
 
     // FIXME: happens on macosx, don't know why
     if (releases == null) {
@@ -196,6 +186,9 @@ public class ContributedPlatformTableCellJPanel extends JPanel {
     }
 
     ContributedPlatform selected = releases.getSelected();
+    TitledBorder titledBorder = BorderFactory.createTitledBorder(selected.getName());
+    titledBorder.setTitleFont(getFont().deriveFont(Font.BOLD));
+    setBorder(titledBorder);
     ContributedPlatform installed = releases.getInstalled();
 
     boolean removable, installable, upgradable;
@@ -221,7 +214,7 @@ public class ContributedPlatformTableCellJPanel extends JPanel {
     removeButtonPlaceholder.setVisible(!removable);
 
     String desc = "<html><body>";
-    desc += "<b>" + selected.getName() + "</b>";
+//    desc += "<b>" + selected.getName() + "</b>";
     if (installed != null && installed.isBuiltIn()) {
       desc += " Built-In ";
     }
@@ -268,7 +261,6 @@ public class ContributedPlatformTableCellJPanel extends JPanel {
     description.setText(desc);
     // copy description to accessibility context for screen readers to use
     description.getAccessibleContext().setAccessibleDescription(desc);
-    description.setBackground(Color.WHITE);
 
     // for modelToView to work, the text area has to be sized. It doesn't
     // matter if it's visible or not.
@@ -278,20 +270,9 @@ public class ContributedPlatformTableCellJPanel extends JPanel {
     int width = parentTable.getBounds().width;
     InstallerTableCell.setJTextPaneDimensionToFitContainedText(description,
                                                                width);
-
-    if (isSelected) {
-      setBackground(parentTable.getSelectionBackground());
-      setForeground(parentTable.getSelectionForeground());
-    } else {
-      setBackground(parentTable.getBackground());
-      setForeground(parentTable.getForeground());
-    }
   }
 
   private JTextPane makeNewDescription() {
-    if (getComponentCount() > 0) {
-      remove(0);
-    }
     JTextPane description = new JTextPane();
     description.setInheritsPopupMenu(true);
     Insets margin = description.getMargin();
@@ -315,7 +296,6 @@ public class ContributedPlatformTableCellJPanel extends JPanel {
         Base.openURL(e.getDescription());
       }
     });
-    add(description, 0);
     return description;
   }
 
@@ -326,4 +306,10 @@ public class ContributedPlatformTableCellJPanel extends JPanel {
     inactiveButtonsPanel.setVisible(!enabled);
   }
 
+  public void setForeground(Color c) {
+    super.setForeground(c);
+    // The description is not opaque, so copy our foreground color to it.
+    if (description != null)
+      description.setForeground(c);
+  }
 }
