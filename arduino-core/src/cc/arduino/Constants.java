@@ -75,7 +75,7 @@ public class Constants {
     if (extenalPackageIndexUrl != null && !"".equals(extenalPackageIndexUrl)) {
       PACKAGE_INDEX_URL = extenalPackageIndexUrl;
     } else {
-      PACKAGE_INDEX_URL = "https://www.energia.nu/packages/package_index.json";
+      PACKAGE_INDEX_URL = "https://energia.nu/packages/package_index.json";
     }
 
     String externalLibraryIndexUrl = System.getProperty("LIBRARY_INDEX_URL");
@@ -88,8 +88,8 @@ public class Constants {
         LIBRARY_INDEX_URL_GZ = "";
       }
     } else {
-      LIBRARY_INDEX_URL = "http://www.energia.nu/libraries/library_index.json";
-      LIBRARY_INDEX_URL_GZ = "http://www.energia.nu/libraries/library_index.json.gz";
+      LIBRARY_INDEX_URL = "https://energia.nu/libraries/library_index.json";
+      LIBRARY_INDEX_URL_GZ = "https://energia.nu/libraries/library_index.json.gz";
     }
   }
 
