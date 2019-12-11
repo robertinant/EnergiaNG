@@ -102,7 +102,7 @@
   <property name="AVRGCC-VERSION" value="4.9.2-atmel3.5.4-arduino2" />
   <property name="AVRDUDE-VERSION" value="6.3.0-arduino9" />
   <property name="arduinoOTA-VERSION" value="1.1.1" />
-  <property name="MSPGCC-VERSION" value="4.6.6" />
+  <property name="MSPGCC-VERSION" value="4.6.7" />
   <property name="MSPDEBUG-VERSION" value="0.24" />
   <property name="DSLITE-VERSION" value="9.2.0.1793-e1" />
   <property name="MSP430-CORE-VERSION" value="1.0.6" />
