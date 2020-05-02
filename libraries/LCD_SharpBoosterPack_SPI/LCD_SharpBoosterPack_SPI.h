@@ -5,7 +5,7 @@
 //
 //  Author :  Stefan Schauer
 //  Date   :  Mar 05, 2015
-//  Version:  1.02
+//  Version:  1.04
 //  File   :  LCD_SharpBoosterPack_SPI_main.h
 //
 //  Based on the LCD5110 Library
@@ -21,6 +21,11 @@
 //  Added support for Sharp 128 with minimal change
 //  Added flushReversed() for reversed display and preserved buffer
 //
+//  Edited 2020-05-02 by StefanSch
+//  Added support for CC13xx to support low power consuption
+//  Added powerSave() function
+//  Replaced OneMsTimer with RTOS function if available
+//
 
 #ifndef LCD_SharpBoosterPack_SPI_h
 #define LCD_SharpBoosterPack_SPI_h
@@ -29,7 +34,9 @@
 #include "Terminal6.h"
 #include "Terminal12.h"
 #include <SPI.h>
+#if !defined(ti_sysbios_BIOS___VERS)
 #include <OneMsTaskTimer.h>
+#endif
 #include <Print.h>
 
 #define SHARP_96 96
@@ -45,6 +52,13 @@ tLCDWrapType;
 
 #define NUM_OF_FONTS 2
 typedef uint8_t tNumOfFontsType;
+
+typedef enum
+{
+    LCDPowerSaveOff,                    // normal operation mode
+    LCDPowerSaveOn,                     // power save mode enalbed
+}
+tLCDPowerModeType;
 
 
 ///
@@ -140,6 +154,13 @@ class LCD_SharpBoosterPack_SPI : public Print
     ///
     uint8_t getSize();
 
+    ///
+    /// @brief    PowerSave mode. Disables the SPI module and enalbes/disables it for any following transfer
+    /// @return   -
+    ///
+    void powerSave(tLCDPowerModeType);
+
+
     void setLineSpacing(uint8_t pixel);
     void setXY(uint8_t x, uint8_t y, uint8_t ulValue);
     //void text(uint8_t x, uint8_t y, String s);
@@ -169,8 +190,8 @@ class LCD_SharpBoosterPack_SPI : public Print
   private:
     uint16_t _index(uint8_t x, uint8_t y);
     tNumOfFontsType _font;
-    void TA0_enableVCOMToggle();
-    void TA0_turnOff();
+    void LCD_enableVCOMToggle();
+    void LCD_turnOff();
     uint8_t _orientation;
     bool _reverse;
     uint8_t lcd_vertical_max;
