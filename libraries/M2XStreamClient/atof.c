@@ -1,6 +1,7 @@
 #ifdef __cplusplus
 extern "C"{
 #endif // __cplusplus
+#include <ctype.h>
 double atof(const char *s)
 {
 	double a = 0.0;

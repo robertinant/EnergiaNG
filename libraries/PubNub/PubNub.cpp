@@ -434,7 +434,7 @@ void PubSubClient::_grab_timetoken(uint8_t *nextbuf, size_t nextsize)
 	 */
 	/* Somewhat unwieldy macros that will first exhaust nextbuf[],
 	 * then read directly from socket. */
-#define WAIT() do { \
+#define WAIT1() do { \
 	if (nextsize > 0) \
 		break; \
 	if (!wait_for_data()) { \
@@ -443,10 +443,10 @@ void PubSubClient::_grab_timetoken(uint8_t *nextbuf, size_t nextsize)
 	} \
 } while (0)
 #define GETCHAR() (nextsize > 0 ? (nextsize--, *nextbuf++) : read())
-	do { WAIT(); } while (GETCHAR() != ',');
-	do { WAIT(); } while (GETCHAR() != '"');
+	do { WAIT1(); } while (GETCHAR() != ',');
+	do { WAIT1(); } while (GETCHAR() != '"');
 	do {
-		WAIT();
+		WAIT1();
 		char ch = GETCHAR();
 		if (ch == '"')
 			break;

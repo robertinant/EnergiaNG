@@ -19,7 +19,9 @@
 
 //#define TESTDIE 0x0C78
 //#define TESTVOLT 0xFEED
+#if !defined(ARDUINO)
 #define ARDUINO 100
+#endif
 
 Adafruit_TMP007::Adafruit_TMP007(uint8_t i2caddr) {
   _addr = i2caddr;

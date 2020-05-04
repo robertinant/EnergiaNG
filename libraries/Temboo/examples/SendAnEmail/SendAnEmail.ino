@@ -88,7 +88,7 @@ void setup() {
  
   while(wifiStatus != WL_CONNECTED) {
     Serial.print("WiFi:");
-    wifiStatus = WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    wifiStatus = WiFi.begin((char *)WIFI_SSID, (char *)WIFI_PASSWORD);
 
     if (wifiStatus == WL_CONNECTED) {
       Serial.println("OK");

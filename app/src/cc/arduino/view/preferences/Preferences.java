@@ -91,7 +91,7 @@ public class Preferences extends javax.swing.JDialog {
 
     Base.registerWindowCloseKeys(getRootPane(), this::cancelButtonActionPerformed);
 
-    showPrerefencesData();
+    showPreferencesData();
   }
 
   /**
@@ -132,10 +132,9 @@ public class Preferences extends javax.swing.JDialog {
     enableCodeFoldingBox = new javax.swing.JCheckBox();
     verifyUploadBox = new javax.swing.JCheckBox();
     externalEditorBox = new javax.swing.JCheckBox();
-    cacheCompiledCore = new javax.swing.JCheckBox();
     checkUpdatesBox = new javax.swing.JCheckBox();
-    updateExtensionBox = new javax.swing.JCheckBox();
     saveVerifyUploadBox = new javax.swing.JCheckBox();
+    accessibleIDEBox = new javax.swing.JCheckBox();
     jLabel1 = new javax.swing.JLabel();
     jLabel2 = new javax.swing.JLabel();
     scaleSpinner = new javax.swing.JSpinner();
@@ -180,7 +179,7 @@ public class Preferences extends javax.swing.JDialog {
 
     sketchbookLocationLabel.setText(tr("Sketchbook location:"));
     sketchbookLocationLabel.setLabelFor(sketchbookLocationField);
-    
+
     sketchbookLocationField.setColumns(40);
 
     browseButton.setText(I18n.PROMPT_BROWSE);
@@ -193,7 +192,7 @@ public class Preferences extends javax.swing.JDialog {
     comboLanguageLabel.setText(tr("Editor language: "));
 
     requiresRestartLabel.setText(tr("  (requires restart of Arduino)"));
-    
+
     comboLanguage.getAccessibleContext().setAccessibleName("Editor language (requires restart of Arduino)");
 
     fontSizeLabel.setText(tr("Editor font size: "));
@@ -248,7 +247,7 @@ public class Preferences extends javax.swing.JDialog {
     arduinoNotRunningLabel.setForeground(Color.GRAY);
     arduinoNotRunningLabel.setText(tr("(edit only when Arduino is not running)"));
 
-    checkboxesContainer.setLayout(new javax.swing.BoxLayout(checkboxesContainer, javax.swing.BoxLayout.Y_AXIS));
+    checkboxesContainer.setLayout(new GridLayout(0,2));
 
     displayLineNumbersBox.setText(tr("Display line numbers"));
     checkboxesContainer.add(displayLineNumbersBox);
@@ -277,17 +276,14 @@ public class Preferences extends javax.swing.JDialog {
 
     checkboxesContainer.add(externalEditorBox);
 
-    cacheCompiledCore.setText(tr("Aggressively cache compiled core"));
-    checkboxesContainer.add(cacheCompiledCore);
-
     checkUpdatesBox.setText(tr("Check for updates on startup"));
     checkboxesContainer.add(checkUpdatesBox);
 
-    updateExtensionBox.setText(tr("Update sketch files to new extension on save (.pde -> .ino)"));
-    checkboxesContainer.add(updateExtensionBox);
-
     saveVerifyUploadBox.setText(tr("Save when verifying or uploading"));
     checkboxesContainer.add(saveVerifyUploadBox);
+
+    accessibleIDEBox.setText(tr("Use accessibility features"));
+    checkboxesContainer.add(accessibleIDEBox);
 
     jLabel1.setText(tr("Interface scale:"));
 
@@ -307,7 +303,7 @@ public class Preferences extends javax.swing.JDialog {
     autoScaleCheckBox.getAccessibleContext().setAccessibleName("Automatic interface scale (requires restart of Arduino");
 
     jLabel3.setText("%");
-    
+
     comboThemeLabel.setText(tr("Theme: "));
 
     comboTheme.getAccessibleContext().setAccessibleName("Theme (requires restart of Arduino)");
@@ -322,7 +318,7 @@ public class Preferences extends javax.swing.JDialog {
         .addContainerGap()
         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
           .addGroup(jPanel1Layout.createSequentialGroup()
-            .addComponent(sketchbookLocationField, javax.swing.GroupLayout.DEFAULT_SIZE, 553, Short.MAX_VALUE)
+            .addComponent(sketchbookLocationField, javax.swing.GroupLayout.DEFAULT_SIZE, 400, Short.MAX_VALUE)
             .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
             .addComponent(browseButton))
           .addComponent(checkboxesContainer, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -631,13 +627,13 @@ public class Preferences extends javax.swing.JDialog {
     getContentPane().setLayout(layout);
     layout.setHorizontalGroup(
       layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-      .addGap(0, 691, Short.MAX_VALUE)
+      .addGap(0, 800, Short.MAX_VALUE)
       .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
         .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
     );
     layout.setVerticalGroup(
       layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-      .addGap(0, 580, Short.MAX_VALUE)
+      .addGap(0, 400, Short.MAX_VALUE)
       .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
         .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
     );
@@ -721,6 +717,7 @@ public class Preferences extends javax.swing.JDialog {
   private javax.swing.JCheckBox autoScaleCheckBox;
   private javax.swing.JButton browseButton;
   private javax.swing.JCheckBox checkUpdatesBox;
+  private javax.swing.JCheckBox accessibleIDEBox;
   private javax.swing.JPanel checkboxesContainer;
   private javax.swing.JComboBox comboLanguage;
   private javax.swing.JLabel comboLanguageLabel;
@@ -730,7 +727,6 @@ public class Preferences extends javax.swing.JDialog {
   private javax.swing.JCheckBox enableCodeFoldingBox;
   private javax.swing.JButton extendedAdditionalUrlFieldWindow;
   private javax.swing.JCheckBox externalEditorBox;
-  private javax.swing.JCheckBox cacheCompiledCore;
   private javax.swing.JTextField fontSizeField;
   private javax.swing.JLabel fontSizeLabel;
   private javax.swing.JLabel jLabel1;
@@ -759,7 +755,6 @@ public class Preferences extends javax.swing.JDialog {
   private javax.swing.JLabel showVerboseLabel;
   private javax.swing.JTextField sketchbookLocationField;
   private javax.swing.JLabel sketchbookLocationLabel;
-  private javax.swing.JCheckBox updateExtensionBox;
   private javax.swing.JCheckBox verboseCompilationBox;
   private javax.swing.JCheckBox verboseUploadBox;
   private javax.swing.JCheckBox verifyUploadBox;
@@ -793,7 +788,7 @@ public class Preferences extends javax.swing.JDialog {
 
     Language newLanguage = (Language) comboLanguage.getSelectedItem();
     PreferencesData.set("editor.languages.current", newLanguage.getIsoCode());
-    
+
     if (comboTheme.getSelectedIndex() == 0) {
       PreferencesData.set("theme.file", "");
     } else {
@@ -834,13 +829,9 @@ public class Preferences extends javax.swing.JDialog {
 
     PreferencesData.setBoolean("editor.external", externalEditorBox.isSelected());
 
-    PreferencesData.setBoolean("compiler.cache_core", cacheCompiledCore.isSelected());
-
     PreferencesData.setBoolean("update.check", checkUpdatesBox.isSelected());
 
-    PreferencesData.setBoolean("editor.update_extension", updateExtensionBox.isSelected());
-
-    PreferencesData.setBoolean("editor.save_on_verify", saveVerifyUploadBox.isSelected());
+    PreferencesData.setBoolean("ide.accessible", accessibleIDEBox.isSelected());
 
     PreferencesData.set("boardsmanager.additional.urls", additionalBoardsManagerField.getText().replace("\r\n", "\n").replace("\r", "\n").replace("\n", ","));
 
@@ -855,7 +846,7 @@ public class Preferences extends javax.swing.JDialog {
     PreferencesData.set(Constants.PREF_PROXY_AUTO_PASSWORD, String.valueOf(autoProxyPassword.getPassword()));
   }
 
-  private void showPrerefencesData() {
+  private void showPreferencesData() {
     sketchbookLocationField.setText(PreferencesData.get("sketchbook.path"));
 
     String currentLanguageISOCode = PreferencesData.get("editor.languages.current");
@@ -864,7 +855,7 @@ public class Preferences extends javax.swing.JDialog {
         comboLanguage.setSelectedItem(language);
       }
     }
-    
+
     String selectedTheme = PreferencesData.get("theme.file", "");
     Collection<ZippedTheme> availablethemes = Theme.getAvailablethemes();
     comboTheme.addItem(tr("Default theme"));
@@ -906,11 +897,17 @@ public class Preferences extends javax.swing.JDialog {
 
     externalEditorBox.setSelected(PreferencesData.getBoolean("editor.external"));
 
-    cacheCompiledCore.setSelected(PreferencesData.get("compiler.cache_core") == null || PreferencesData.getBoolean("compiler.cache_core"));
+    if (PreferencesData.get("compiler.cache_core") == null) {
+      PreferencesData.setBoolean("compiler.cache_core", true);
+    }
 
     checkUpdatesBox.setSelected(PreferencesData.getBoolean("update.check"));
 
-    updateExtensionBox.setSelected(PreferencesData.get("editor.update_extension") == null || PreferencesData.getBoolean("editor.update_extension"));
+    if (PreferencesData.get("editor.update_extension") == null) {
+      PreferencesData.setBoolean("editor.update_extension", true);
+    }
+
+    accessibleIDEBox.setSelected(PreferencesData.getBoolean("ide.accessible"));
 
     saveVerifyUploadBox.setSelected(PreferencesData.getBoolean("editor.save_on_verify"));
 

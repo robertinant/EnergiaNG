@@ -229,7 +229,7 @@ int TembooChoreo::run(IPAddress addr, uint16_t port, uint16_t timeoutSecs, bool 
             delay(10);
         }
         
-        if (!m_client.findUntil("HTTP/1.", HTTP_EOL)) {
+        if (!m_client.findUntil((char *)"HTTP/1.", HTTP_EOL)) {
             TEMBOO_TRACELN("No HTTP");
             return TEMBOO_ERROR_HTTP_ERROR;
         }
@@ -249,7 +249,7 @@ int TembooChoreo::run(IPAddress addr, uint16_t port, uint16_t timeoutSecs, bool 
         // if we get an auth error AND there was an x-temboo-time header,
         // update the session timeOffset
         if ((httpCode == 401) && (i == 0)) {
-            if (m_client.findUntil("x-temboo-time:", HTTP_EOH)) {
+            if (m_client.findUntil((char *)"x-temboo-time:", HTTP_EOH)) {
                 TembooSession::setTime((unsigned long)m_client.parseInt());
                 while(m_client.available()) {
                     m_client.read();

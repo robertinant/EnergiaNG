@@ -19,6 +19,7 @@
 # Translators:
 # Translators:
 # Translators:
+# Translators:
 # corneliu.e <corneliueva@yahoo.com>, 2013-2014
 # Cristian Maglie <c.maglie@arduino.cc>, 2016
 # kobalt <kobalt_mstr@yahoo.it>, 2012
@@ -26,16 +27,17 @@
 # micuadriandanut <micu.adrian.danut@outlook.com>, 2015
 # Pop Gheorghe <office@roroid.ro>, 2013
 # Popescu Robert <popescu.robert.adrian@gmail.com>, 2017
-# Pop Gheorghe <office@roroid.ro>, 2013-2015,2017
+# Pop Gheorghe <office@roroid.ro>, 2013-2015,2017,2019
 # Sorin Bancila <bancila49@gmail.com>, 2018
 # Vlăduț Ilie <vladilie94@gmail.com>, 2015
+# Vlăduț Ilie <vladilie94@gmail.com>, 2018
 msgid ""
 msgstr ""
 "Project-Id-Version: Arduino IDE 1.5\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2012-03-29 10:24-0400\n"
-"PO-Revision-Date: 2018-09-06 13:55+0000\n"
-"Last-Translator: Cristian Maglie <c.maglie@arduino.cc>\n"
+"PO-Revision-Date: 2019-07-24 12:14+0000\n"
+"Last-Translator: Pop Gheorghe <office@roroid.ro>\n"
 "Language-Team: Romanian (http://www.transifex.com/mbanzi/arduino-ide-15/language/ro/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -636,7 +638,7 @@ msgstr "Nu se poate înlocui {0}"
 #: ../../../../../arduino-core/src/processing/app/PreferencesData.java:141
 #, java-format
 msgid "Could not write preferences file: {0}"
-msgstr ""
+msgstr "Nu se pot scrie preferințele fișierului: {0}"
 
 #: tools/Archiver.java:74
 msgid "Couldn't archive sketch"
@@ -695,7 +697,7 @@ msgstr "Implicit"
 
 #: ../../../../../app/src/cc/arduino/view/preferences/Preferences.java:870
 msgid "Default theme"
-msgstr ""
+msgstr "Temă implicită"
 
 #: EditorHeader.java:314 Sketch.java:591
 msgid "Delete"
@@ -875,7 +877,7 @@ msgstr "Eroare în Serial.{0}()"
 #: ../../../../../app/src/processing/app/Theme.java:302
 #, java-format
 msgid "Error loading theme {0}: {1}"
-msgstr ""
+msgstr "Eroare la încărcarea temei {0}: {1}"
 
 #: ../../../processing/app/debug/TargetPlatform.java:95
 #: ../../../processing/app/debug/TargetPlatform.java:106
@@ -901,19 +903,19 @@ msgstr "Eroare la deschiderea portului serial ''{0}''. Încercați să consulta�
 msgid ""
 "Error parsing libraries index: {0}\n"
 "Try to open the Library Manager to update the libraries index."
-msgstr ""
+msgstr "Eroare la analizarea index-ului bibliotecii: {0}\nIncearca sa actualizezi indexul bibliotecilor in Manager biblioteci:"
 
 #: ../../../../../arduino-core/src/cc/arduino/contributions/libraries/LibrariesIndexer.java:112
 #, java-format
 msgid "Error reading libraries index: {0}"
-msgstr ""
+msgstr "Eroare la citirea indexului bibliotecilor: {0}"
 
 #: ../../../../../arduino-core/src/cc/arduino/contributions/packages/ContributionsIndexer.java:113
 #, java-format
 msgid ""
 "Error reading package indexes folder: {0}\n"
 "(maybe a permission problem?)"
-msgstr ""
+msgstr "Eroare la citirea indexului dosarului pachetelor: {0}\n(poate o problemă de permisiune?)"
 
 #: Preferences.java:277
 msgid "Error reading preferences"
@@ -948,6 +950,10 @@ msgstr "Eroare în timpul încărcării bootloader-ului."
 #: ../../../processing/app/Editor.java:2555
 msgid "Error while burning bootloader: missing '{0}' configuration parameter"
 msgstr "Eroare în timpul încărcării bootloader-ului: lipseşte parametrul de configurare '{0}'"
+
+#: ../../../../../app/src/processing/app/Editor.java:2355
+msgid "Error while burning bootloader: please select a serial port."
+msgstr "Eroare la scrierea bootloader-ului: te rog alege un port serial."
 
 #: ../../../../../app/src/processing/app/Editor.java:1940
 msgid "Error while compiling: missing '{0}' configuration parameter"
@@ -1190,7 +1196,7 @@ msgstr "Ignora majuscule"
 
 #: ../../../../../arduino-core/src/cc/arduino/contributions/libraries/LibrariesIndexer.java:184
 msgid "Ignoring library with bad name"
-msgstr ""
+msgstr "Se ignora biblioteca cu nume greșit"
 
 #: Base.java:1436
 msgid "Ignoring sketch with bad name"
@@ -1256,7 +1262,7 @@ msgstr "Instalare plăci..."
 #: ../../../../../arduino-core/src/cc/arduino/contributions/libraries/LibraryInstaller.java:109
 #, java-format
 msgid "Installing library: {0}:{1}"
-msgstr ""
+msgstr "Instalare bibliotecă: {0}:{1}"
 
 #: ../../../cc/arduino/contributions/packages/ContributionInstaller.java:134
 #, java-format
@@ -1285,7 +1291,13 @@ msgstr "Bloc invalid: caracterul  [{0}] de închidere nu a fost găsit."
 #: ../../../../../arduino-core/src/processing/app/packages/UserLibrary.java:158
 #, java-format
 msgid "Invalid version '{0}' for library in: {1}"
-msgstr ""
+msgstr "Versiunea '{0}' este invalidă pentru bibliotecă în: {1}"
+
+#: ../../../../../app/src/processing/app/Base.java:316
+#: ../../../../../app/src/processing/app/Base.java:362
+#, java-format
+msgid "Invalid version {0}"
+msgstr "Versiune invalida {0}"
 
 #: Preferences.java:102
 msgid "Italian"
@@ -1309,7 +1321,7 @@ msgstr "Letonă"
 
 #: ../../../../../app/src/cc/arduino/contributions/libraries/ui/LibraryManagerUI.java:93
 msgid "Library Manager"
-msgstr "Manager Librari"
+msgstr "Manager Biblioteci"
 
 #: ../../../../../app/src/processing/app/Base.java:2349
 msgid "Library added to your libraries. Check \"Include library\" menu"
@@ -1322,7 +1334,7 @@ msgstr "Biblioteca nu poate utiliza folderele \"src\" și \"utility\". Confirma�
 #: ../../../../../arduino-core/src/cc/arduino/contributions/libraries/LibraryInstaller.java:88
 #, java-format
 msgid "Library is already installed: {0}:{1}"
-msgstr ""
+msgstr "Biblioteca este deja instalată: {0}:{1}"
 
 #: ../../../../../app/src/cc/arduino/view/GoToLineNumber.java:70
 msgid "Line number:"
@@ -1364,7 +1376,7 @@ msgstr "Mesaj"
 #: ../../../../../arduino-core/src/cc/arduino/Compiler.java:81
 #, java-format
 msgid "Missing '{0}' from library in {1}"
-msgstr "Lipsă '{0}' din librărie in {1}"
+msgstr "Lipsă '{0}' din biblioteca in {1}"
 
 #: ../../../processing/app/BaseNoGui.java:455
 msgid "Mode not supported"
@@ -1602,10 +1614,6 @@ msgstr "Te rog importa biblioteca SPI din meniul Schiţe > Importă bibliotecă.
 msgid "Please import the Wire library from the Sketch > Import Library menu."
 msgstr "Te rog importă biblioteca Wire din meniul Schiţă > Imporă bibliotecă"
 
-#: ../../../../../app/src/processing/app/SketchController.java:713
-msgid "Please select a Port before Upload"
-msgstr ""
-
 #: ../../../../../app//src/processing/app/Editor.java:2799
 msgid "Please select a port to obtain board info"
 msgstr "Va rog selectaţi un port pentru a obţine informaţii despre placă"
@@ -1746,7 +1754,7 @@ msgstr "Înlătură"
 #: ../../../../../arduino-core/src/cc/arduino/contributions/libraries/LibraryInstaller.java:142
 #, java-format
 msgid "Removing library: {0}:{1}"
-msgstr ""
+msgstr "Înlăturare bibliotecă: {0}:{1}"
 
 #: ../../../../../app/src/cc/arduino/contributions/libraries/ui/LibraryManagerUI.java:266
 #: ../../../../../app/src/cc/arduino/contributions/packages/ui/ContributionManagerUI.java:203
@@ -1781,6 +1789,10 @@ msgstr "Înlocuire cu:"
 #: ../../../../../arduino-core/src/processing/app/I18n.java:28
 msgid "Retired"
 msgstr "Retras"
+
+#: ../../../../../app/src/processing/app/Editor.java:1973
+msgid "Retry the upload with another serial port?"
+msgstr "Incerci incarcarea pe un alt port serial?"
 
 #: Preferences.java:113
 msgid "Romanian"
@@ -1892,7 +1904,7 @@ msgstr "Serial Plotter"
 msgid ""
 "Serial monitor is not supported on network ports such as {0} for the {1} in "
 "this release"
-msgstr "Serial monitor nu este disponibil pentru porturile đin rețea, cum ar {0} pentru {1} în această versiune."
+msgstr "Monitorul serial nu este disponibil pentru porturile đin rețea, cum ar fi {0} pentru {1} în această versiune."
 
 #: ../../../../../app/src/processing/app/Editor.java:2516
 msgid "Serial monitor not available while plotter is open"
@@ -1905,12 +1917,15 @@ msgid ""
 " Serial Port menu?"
 msgstr "Nu am găsit portul serial ''{0}''. Ai făcut corect selecţia în meniul Instrumente> Port serial?"
 
-#: Editor.java:2343
+#: ../../../../../app/src/processing/app/Editor.java:1969
+#: ../../../../../app/src/processing/app/Editor.java:2040
+msgid "Serial port not selected."
+msgstr "Port serial nedetectat"
+
+#: ../../../../../app/src/processing/app/Editor.java:1971
 #, java-format
-msgid ""
-"Serial port {0} not found.\n"
-"Retry the upload with another serial port?"
-msgstr "Portul serial {0} nu a fost găsit.\nDoreşti sa utilizezi un alt port serial?"
+msgid "Serial port {0} not found."
+msgstr "Portul serial {0} negasit."
 
 #: ../../../../../app/src/processing/app/Editor.java:65
 msgid "Serial ports"
@@ -1935,7 +1950,7 @@ msgstr "Deschide directorul schiţei"
 
 #: ../../../../../app/src/processing/app/AbstractTextMonitor.java:101
 msgid "Show timestamp"
-msgstr ""
+msgstr "Arată marcajul de timp"
 
 #: Preferences.java:387
 msgid "Show verbose output during: "
@@ -2001,7 +2016,7 @@ msgstr "Calea către documentaţia schiţei nu este definită"
 #: ../../../../../arduino-core//src/cc/arduino/contributions/packages/ContributionsIndexer.java:96
 #, java-format
 msgid "Skipping contributed index file {0}, parsing error occured:"
-msgstr ""
+msgstr "Sar peste fisierul index {0}, a aparut o eroare la analiza acestuia:"
 
 #: ../../../../../app/src/processing/app/Preferences.java:185
 msgid "Slovak"
@@ -2114,7 +2129,7 @@ msgid ""
 "The library \"{0}\" cannot be used.\n"
 "Library folder names must start with a letter or number, followed by letters,\n"
 "numbers, dashes, dots and underscores. Maximum length is 63 characters."
-msgstr ""
+msgstr "Biblioteca \\\"{0}\\\" nu poate fi folosită.\nNumele bibliotecii trebuie să inceapa cu o litera sau un numar, urmat de litere,\nnumere,lini, puncte sau underline. Lungimea maxima e de 63 de caractere."
 
 #: Base.java:1054 Base.java:2674
 #, java-format
@@ -2166,7 +2181,7 @@ msgid ""
 "The sketch name had to be modified.\n"
 "Sketch names must start with a letter or number, followed by letters,\n"
 "numbers, dashes, dots and underscores. Maximum length is 63 characters."
-msgstr ""
+msgstr "Numele scitei a trebuit modificat.\nNumele schitei trebuie sa inceapa cu o litera sau un numar, urmat de o litera,\nnumar, liniuta,punct sau underline. Lungimea maxima este de 63 caractere."
 
 #: Base.java:259
 msgid ""
@@ -2185,7 +2200,7 @@ msgstr "Directorul de schițe specificat conține o copie a IDE-ului.\nVă rugă
 
 #: ../../../../../app/src/cc/arduino/view/preferences/Preferences.java:311
 msgid "Theme: "
-msgstr ""
+msgstr "Tema: "
 
 #: ../../../../../app/src/cc/arduino/contributions/libraries/ui/LibraryManagerUI.java:257
 msgid ""
@@ -2198,7 +2213,7 @@ msgid ""
 "This report would have more information with\n"
 "\"Show verbose output during compilation\"\n"
 "option enabled in File -> Preferences.\n"
-msgstr ""
+msgstr "Acest raport poate contine mai multe informatii daca\nselectati optiunea \"Detaliază informaţiile de ieşire a compilatorului\"\nin Fisier -> Preferinte.\n"
 
 #: Base.java:535
 msgid "Time for a Break"
@@ -2683,7 +2698,7 @@ msgstr "numele este inexistent"
 #: ../../../../../arduino-core/src/cc/arduino/contributions/libraries/LibrariesIndexer.java:227
 #, java-format
 msgid "no headers files (.h) found in {0}"
-msgstr ""
+msgstr "fisierele header (.h) nu au fost gasite in {0}"
 
 #: Editor.java:932
 msgid "serialMenu is null"
@@ -2785,7 +2800,7 @@ msgstr "{0}: Opțiune invalidă, ar trebuii să fie de forma \"name=value\""
 #: ../../../../../arduino-core/src/processing/app/helpers/CommandlineParser.java:268
 #, java-format
 msgid "{0}: Invalid value for option \"{1}\" for board \"{2}\""
-msgstr ""
+msgstr "{0}: Valoare invalida pentru optiunea \"{1}\" la placa \"{2}\""
 
 #: ../../../processing/app/Base.java:486
 #, java-format

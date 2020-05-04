@@ -69,11 +69,13 @@
   <property name="LINUX32_BUNDLED_JVM" value="none"/>
   <property name="LINUX64_BUNDLED_JVM" value="${java.home}"/>
   <property name="LINUXARM_BUNDLED_JVM" value="none"/>
+  <property name="LINUXAARCH64_BUNDLED_JVM" value="none"/>
   <condition property="linux-bundle-jvm-task" value="noop">
     <and>
       <equals arg1="${LINUX32_BUNDLED_JVM}" arg2="none"/>
       <equals arg1="${LINUX64_BUNDLED_JVM}" arg2="none"/>
       <equals arg1="${LINUXARM_BUNDLED_JVM}" arg2="none"/>
+      <equals arg1="${LINUXAARCH64_BUNDLED_JVM}" arg2="none"/>
     </and>
   </condition>
   <condition property="linux-bundle-jvm-task" value="bundle">
@@ -87,20 +89,23 @@
       <not>
         <equals arg1="${LINUXARM_BUNDLED_JVM}" arg2="none"/>
       </not>
+      <not>
+        <equals arg1="${LINUXAARCH64_BUNDLED_JVM}" arg2="none"/>
+      </not>
     </or>
   </condition>
 
   <property name="portable" value="false" />
 
-  <property name="ARDUINO-BUILDER-VERSION" value="1.4.1" />
+  <property name="ARDUINO-BUILDER-VERSION" value="1.4.7" />
   <property name="LIBLISTSERIAL-VERSION" value="1.4.2" />
   <property name="AVRGCC-VERSION" value="4.9.2-atmel3.5.4-arduino2" />
   <property name="AVRDUDE-VERSION" value="6.3.0-arduino9" />
   <property name="arduinoOTA-VERSION" value="1.1.1" />
-  <property name="MSPGCC-VERSION" value="4.6.6" />
+  <property name="MSPGCC-VERSION" value="4.6.7" />
   <property name="MSPDEBUG-VERSION" value="0.24" />
-  <property name="DSLITE-VERSION" value="8.2.0.1400" />
-  <property name="MSP430-CORE-VERSION" value="1.0.5" />
+  <property name="DSLITE-VERSION" value="9.2.0.1793-e1" />
+  <property name="MSP430-CORE-VERSION" value="1.0.6" />
 
   <!-- Libraries required for running arduino -->
   <fileset dir=".." id="runtime.jars">
@@ -109,6 +114,23 @@
     <include name="app/lib/*.jar" />
     <include name="arduino-core/lib/*.jar" />
   </fileset>
+
+  <!-- Remove all default excludes for directory tasks (see https://ant.apache.org/manual/dirtasks.html#defaultexcludes) -->
+  <defaultexcludes remove="**/.git"/>
+  <defaultexcludes remove="**/.git/**"/>
+  <defaultexcludes remove="**/.gitattributes"/>
+  <defaultexcludes remove="**/.gitignore"/>
+  <defaultexcludes remove="**/.gitmodules"/>
+  <defaultexcludes remove="**/.hg"/>
+  <defaultexcludes remove="**/.hg/**"/>
+  <defaultexcludes remove="**/.hgignore"/>
+  <defaultexcludes remove="**/.hgsub"/>
+  <defaultexcludes remove="**/.hgsubstate"/>
+  <defaultexcludes remove="**/.hgtags"/>
+  <defaultexcludes remove="**/.bzr"/>
+  <defaultexcludes remove="**/.bzr/**"/>
+  <defaultexcludes remove="**/.bzrignore"/>
+
 
   <target name="build" description="Build Arduino.">
     <antcall target="${platform}-build" />
@@ -267,7 +289,7 @@
   <target name="assemble-hardware" unless="light_bundle">
     <mkdir dir="${staging_folder}/work/${staging_hardware_folder}/tmp/msp430-core"/>
 
-    <antcall target="untar">
+    <antcall target="untar-bz2">
       <param name="archive_file" value="./msp430-${MSP430-CORE-VERSION}.tar.bz2"/>
       <param name="archive_url" value="https://s3.amazonaws.com/energiaUS/cores/msp430-${MSP430-CORE-VERSION}.tar.bz2"/>
       <param name="final_folder" value="${staging_folder}/work/${staging_hardware_folder}/tmp/msp430-core/${MSP430-CORE-VERSION}"/>
@@ -375,9 +397,15 @@
             mainclassname="processing.app.Base"
             copyright="Energia"
             applicationCategory="public.app-category.education"
-            minimumsystemversion="10.7"
+            minimumsystemversion="10.8"
             highresolutioncapable="true">
 
+      <runtime dir="${MACOSX_BUNDLED_JVM}"/>
+<!--
+      <runtime dir="/Library/Java/JavaVirtualMachines/jdk1.8.0_111.jdk">
+        <include name="jre/bin/"/>
+      </runtime>
+-->
       <arch name="x86_64"/>
       <arch name="i386"/>
 
@@ -388,11 +416,8 @@
       <option value="-Dcom.apple.smallTabs=true"/>
       <option value="-DAPP_DIR=$APP_ROOT/Contents/Java"/>
       <option value="-Djava.ext.dirs=$JVM_RUNTIME/Contents/Home/lib/ext/:$JVM_RUNTIME/Contents/Home/jre/lib/ext/"/>
+      <option value="-Djava.net.preferIPv4Stack=true"/>
 
-
-      <runtime dir="${MACOSX_BUNDLED_JVM}">
-        <include name="bin/"/>
-      </runtime>
       <!--
       <option value="-Dapple.awt.showGrowBox=false"/>
       <option value="-Dapple.awt.Antialiasing=false"/>
@@ -420,12 +445,13 @@
 
     </bundleapp>
 
-     <echo message="$JVM_RUNTIME/Contents/Home/jre/"/>
-     <echo message="${MACOSX_BUNDLED_JVM}"/>
+    <copy todir="${staging_folder}/work/Energia.app/Contents/PlugIns/jdk1.8.0_111.jdk/Contents/Home/jre/">
+      <fileset dir="${MACOSX_BUNDLED_JVM}" includes="bin/java"/>
+    </copy>
 
-      <copy todir="$JVM_RUNTIME/Contents/Home/jre/">
-        <fileset dir="${MACOSX_BUNDLED_JVM}" includes="bin/**"/>
-      </copy>
+    <chmod perm="ugo+x">
+        <fileset dir="${staging_folder}/work/Energia.app/Contents/PlugIns/jdk1.8.0_111.jdk/Contents/Home/jre/bin/" includes="java" />
+    </chmod>
 
     <mkdir dir="${staging_folder}/work/${staging_hardware_folder}" />
 
@@ -475,7 +501,7 @@
   <!-- Unzip MSP430 tools -->
   <target name="macosx-build-msp430-toolchain" unless="light_bundle">
     <antcall target="msp430-toolchain-bundle">
-      <param name="unpack_target" value="untar"/>
+      <param name="unpack_target" value="untar-native"/>
       <param name="gcc_archive_file" value="msp430-gcc-${MSPGCC-VERSION}-i386-apple-darwin11.tar.bz2"/>
       <param name="gcc_version" value="${MSPGCC-VERSION}"/>
       <param name="dslite_archive_file" value="dslite-${DSLITE-VERSION}-x86_64-apple-darwin.tar.bz2"/>
@@ -507,9 +533,7 @@
     <delete dir="macosx/work/Energia.app" />
 
     <!-- Unzip unsigned app into working dir -->
-    <exec executable="unzip" dir="macosx/work" failonerror="true">
-      <arg line="../energia-${version}-${platform}.zip" />
-    </exec>
+    <unzip src="../energia-${version}-${platform}.zip" dest="macosx/work"/>
 
     <!-- Unlock keychain file -->
 <!--
@@ -692,7 +716,7 @@
     <antcall target="build-arduino-builder" />
 
     <antcall target="avr-toolchain-bundle">
-      <param name="unpack_target" value="untar"/>
+      <param name="unpack_target" value="untar-native"/>
       <param name="gcc_archive_file" value="avr-gcc-${AVRGCC-VERSION}-armhf-pc-linux-gnu.tar.bz2"/>
       <param name="gcc_version" value="${AVRGCC-VERSION}"/>
       <param name="avrdude_archive_file" value="avrdude-${AVRDUDE-VERSION}-armhf-pc-linux-gnu.tar.bz2"/>
@@ -710,7 +734,7 @@
     <antcall target="build-arduino-builder" />
 
     <antcall target="msp430-toolchain-bundle">
-      <param name="unpack_target" value="untar"/>
+      <param name="unpack_target" value="untar-native"/>
       <param name="gcc_archive_file" value="avr-gcc-4.8.1-arduino5-i686-pc-linux-gnu.tar.bz2"/>
       <param name="gcc_version" value="4.8.1-arduino5"/>
       <param name="avrdude_archive_file" value="avrdude-${AVRDUDE-VERSION}-i686-w64-mingw32.zip"/>
@@ -750,7 +774,7 @@
 
   <target name="linux64-build-msp430-toolchain" unless="light_bundle">
     <antcall target="msp430-toolchain-bundle">
-      <param name="unpack_target" value="untar"/>
+      <param name="unpack_target" value="untar-native"/>
       <param name="gcc_archive_file" value="msp430-gcc-${MSPGCC-VERSION}-i386-x86_64-pc-linux-gnu.tar.bz2"/>
       <param name="gcc_version" value="${MSPGCC-VERSION}"/>
       <param name="dslite_archive_file" value="dslite-${DSLITE-VERSION}-i386-x86_64-pc-linux-gnu.tar.bz2"/>
@@ -780,7 +804,7 @@
   <target name="build-arduino-builder" unless="no_arduino_builder">
     <delete dir="${staging_folder}/arduino-builder-${platform}" includeemptydirs="true"/>
     <mkdir dir="${staging_folder}/arduino-builder-${platform}"/>
-    <antcall target="untar">
+    <antcall target="untar-native">
       <param name="archive_file" value="./energia-builder-${platform}-${ARDUINO-BUILDER-VERSION}.tar.bz2" />
       <param name="archive_url" value="http://s3.amazonaws.com/energiaUS/tools/${platform}/energia-builder-${platform}-${ARDUINO-BUILDER-VERSION}.tar.bz2" />
       <param name="final_folder" value="${staging_folder}/arduino-builder-${platform}/arduino-builder" />
@@ -824,6 +848,14 @@
   <!-- Ensure that the tool is downloaded and test checksums, if everything's ok unzip it on the tools folder  -->
   <target name="untar" depends="untar-unzip-checksum" unless="${archive_file}_installed">
     <echo>Untarring ${archive_file} into folder ${dest_folder}</echo>
+    <untar src="${archive_file}" dest="${dest_folder}"/>
+  </target>
+  <target name="untar-bz2" depends="untar-unzip-checksum" unless="${archive_file}_installed">
+    <echo>Untarring ${archive_file} into folder ${dest_folder}</echo>
+    <untar src="${archive_file}" dest="${dest_folder}" compression="bzip2"/>
+  </target>
+  <target name="untar-native" depends="untar-unzip-checksum" unless="${archive_file}_installed">
+    <echo>Untarring ${archive_file} into folder ${dest_folder}</echo>
     <exec executable="tar" failonerror="true">
       <arg value="xf"/>
       <arg value="${archive_file}"/>
@@ -832,19 +864,7 @@
   </target>
 
   <target name="unzip" depends="untar-unzip-checksum" unless="${archive_file}_installed">
-    <echo>Unzipping ${archive_file} into folder ${dest_folder}</echo>
-    <mkdir dir="${dest_folder}" />
-    <exec executable="unzip" failonerror="true">
-      <arg value="-q" />
-      <arg value="-n" />
-      <arg value="-d" />
-      <arg value="${dest_folder}" />
-      <arg value="${archive_file}" />
-    </exec>
-  </target>
-
-  <target name="unzip-with-ant-task" depends="untar-unzip-checksum" unless="${archive_file}_installed">
-    <echo>Unzipping ${archive_file} into folder ${dest_folder}</echo>
+   <echo>Unzipping ${archive_file} into folder ${dest_folder}</echo>
     <mkdir dir="${dest_folder}" />
     <unzip src="${archive_file}" dest="${dest_folder}"/>
   </target>
@@ -917,7 +937,7 @@
   </target>
 
   <target name="download-launch4j-windows">
-    <antcall target="unzip-with-ant-task">
+    <antcall target="unzip">
       <param name="archive_file" value="windows/launch4j-3.9-win32.zip"/>
       <param name="archive_url" value="https://downloads.arduino.cc/tools/launch4j-3.9-win32.zip"/>
       <param name="final_folder" value="windows/launcher/launch4j"/>
@@ -926,7 +946,7 @@
   </target>
 
   <target name="download-launch4j-linux">
-    <antcall target="untar">
+    <antcall target="untar-native">
       <param name="archive_file" value="windows/launch4j-3.9-linux.tgz"/>
       <param name="archive_url" value="https://downloads.arduino.cc/tools/launch4j-3.9-linux.tgz"/>
       <param name="final_folder" value="windows/launcher/launch4j"/>
@@ -991,7 +1011,7 @@
 
     <delete dir="${staging_folder}/arduino-builder-windows" includeemptydirs="true"/>
     <mkdir dir="${staging_folder}/arduino-builder-windows"/>
-    <antcall target="untar">
+    <antcall target="untar-bz2">
       <param name="archive_file" value="./energia-builder-${platform}-${ARDUINO-BUILDER-VERSION}.tar.bz2" />
       <param name="archive_url" value="http://s3.amazonaws.com/energiaUS/tools/windows/energia-builder-windows-${ARDUINO-BUILDER-VERSION}.tar.bz2" />
       <param name="final_folder" value="${staging_folder}/arduino-builder-windows/arduino-builder.exe" />
@@ -1010,42 +1030,33 @@
     </copy>
     <delete dir="${staging_folder}/arduino-builder-windows" includeemptydirs="true"/>
 
-    <exec executable="unzip" failonerror="true">
-      <arg value="-q" />
-      <arg value="-n" />
-      <arg value="-j" />
-      <arg value="-d" />
-      <arg value="windows/work/lib" />
-      <arg value="../arduino-core/lib/jna-4.2.2.jar" />
-      <arg value="com/sun/jna/win32-x86/jnidispatch.dll" />
-    </exec>
+    <unzip src="../arduino-core/lib/jna-4.2.2.jar" dest="windows/work/lib">
+      <patternset>
+        <include name="com/sun/jna/win32-x86/jnidispatch.dll"/>
+      </patternset>
+      <mapper type="flatten"/>
+    </unzip>
     <move file="windows/work/lib/jnidispatch.dll" tofile="windows/work/lib/jnidispatch-4.2.2-win32-x86.dll" />
     <antcall target="make-file-executable">
       <param name="file" value="windows/work/lib/jnidispatch-4.2.2-win32-x86.dll" />
     </antcall>
 
-    <exec executable="unzip" failonerror="true">
-      <arg value="-q" />
-      <arg value="-n" />
-      <arg value="-j" />
-      <arg value="-d" />
-      <arg value="windows/work/lib" />
-      <arg value="../arduino-core/lib/jssc-2.8.0-arduino1.jar" />
-      <arg value="libs/windows/jSSC-2.8_x86.dll" />
-    </exec>
+    <unzip src="../arduino-core/lib/jssc-2.8.0-arduino4.jar" dest="windows/work/lib">
+      <patternset>
+        <include name="libs/windows/jSSC-2.8_x86.dll"/>
+      </patternset>
+      <mapper type="flatten"/>
+    </unzip>
     <move file="windows/work/lib/jSSC-2.8_x86.dll" tofile="windows/work/lib/jSSC-2.8_x86.dll" />
     <antcall target="make-file-executable">
       <param name="file" value="windows/work/lib/jSSC-2.8_x86.dll" />
     </antcall>
-    <exec executable="unzip" failonerror="true">
-      <arg value="-q" />
-      <arg value="-n" />
-      <arg value="-j" />
-      <arg value="-d" />
-      <arg value="windows/work/lib" />
-      <arg value="../arduino-core/lib/jssc-2.8.0-arduino1.jar" />
-      <arg value="libs/windows/jSSC-2.8_x86_64.dll" />
-    </exec>
+    <unzip src="../arduino-core/lib/jssc-2.8.0-arduino4.jar" dest="windows/work/lib">
+      <patternset>
+        <include name="libs/windows/jSSC-2.8_x86_64.dll"/>
+      </patternset>
+      <mapper type="flatten"/>
+    </unzip>
     <move file="windows/work/lib/jSSC-2.8_x86_64.dll" tofile="windows/work/lib/jSSC-2.8_x86_64.dll" />
     <antcall target="make-file-executable">
       <param name="file" value="windows/work/lib/jSSC-2.8_x86_64.dll" />
@@ -1101,7 +1112,7 @@
 
   <target name="windows-build-msp430-toolchain">
     <antcall target="msp430-toolchain-bundle">
-      <param name="unpack_target" value="untar"/>
+      <param name="unpack_target" value="untar-bz2"/>
       <param name="gcc_archive_file" value="msp430-gcc-${MSPGCC-VERSION}-i686-mingw32.tar.bz2"/>
       <param name="gcc_version" value="${MSPGCC-VERSION}"/>
       <param name="dslite_archive_file" value="dslite-${DSLITE-VERSION}-i686-mingw32.tar.bz2"/>

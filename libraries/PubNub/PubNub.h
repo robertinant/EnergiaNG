@@ -3,7 +3,7 @@
 
 
 #include <stdint.h>
-
+#include <stdio.h>
 
 /* By default, the PubNub library is built to work with the Ethernet
  * shield. WiFi shield support can be enabled by commenting the

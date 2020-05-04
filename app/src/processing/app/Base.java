@@ -27,7 +27,10 @@ import cc.arduino.Constants;
 import cc.arduino.UpdatableBoardsLibsFakeURLsHandler;
 import cc.arduino.UploaderUtils;
 import cc.arduino.contributions.*;
-import cc.arduino.contributions.libraries.*;
+import cc.arduino.contributions.libraries.ContributedLibrary;
+import cc.arduino.contributions.libraries.LibrariesIndexer;
+import cc.arduino.contributions.libraries.LibraryInstaller;
+import cc.arduino.contributions.libraries.LibraryOfSameTypeComparator;
 import cc.arduino.contributions.libraries.ui.LibraryManagerUI;
 import cc.arduino.contributions.packages.ContributedPlatform;
 import cc.arduino.contributions.packages.ContributionInstaller;
@@ -35,10 +38,11 @@ import cc.arduino.contributions.packages.ContributionsIndexer;
 import cc.arduino.contributions.packages.ui.ContributionManagerUI;
 import cc.arduino.files.DeleteFilesOnShutdown;
 import cc.arduino.packages.DiscoveryManager;
+import cc.arduino.packages.Uploader;
 import cc.arduino.view.Event;
 import cc.arduino.view.JMenuUtils;
 import cc.arduino.view.SplashScreenHelper;
-
+import com.github.zafarkhaja.semver.Version;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import processing.app.debug.TargetBoard;
@@ -62,15 +66,16 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
-import java.util.*;
 import java.util.List;
 import java.util.Timer;
+import java.util.*;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static processing.app.I18n.format;
 import static processing.app.I18n.tr;
 
 
@@ -202,6 +207,9 @@ public class Base {
     BaseNoGui.getPlatform().init();
 
     BaseNoGui.initPortableFolder();
+    // This configure the logs root folder
+    System.out.println("Set log4j store directory " + BaseNoGui.getSettingsFolder().getAbsolutePath());
+    System.setProperty("log4j.dir", BaseNoGui.getSettingsFolder().getAbsolutePath());
 
     // Look for a possible "--preferences-file" parameter and load preferences
     BaseNoGui.initParameters(args);
@@ -261,6 +269,8 @@ public class Base {
     splash.splashText(tr("Initializing packages..."));
     BaseNoGui.initPackages();
 
+    parser.getUploadPort().ifPresent(BaseNoGui::selectSerialPort);
+
     splash.splashText(tr("Preparing boards..."));
 
     if (!isCommandLine()) {
@@ -278,8 +288,9 @@ public class Base {
     pdeKeywords = new PdeKeywords();
     pdeKeywords.reload();
 
-    contributionInstaller = new ContributionInstaller(BaseNoGui.getPlatform(), new GPGDetachedSignatureVerifier());
-    libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform());
+    final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
+    contributionInstaller = new ContributionInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
+    libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
 
     parser.parseArgumentsPhase2();
 
@@ -293,7 +304,7 @@ public class Base {
     if (parser.isInstallBoard()) {
       ContributionsIndexer indexer = new ContributionsIndexer(
           BaseNoGui.getSettingsFolder(), BaseNoGui.getHardwareFolder(),
-          BaseNoGui.getPlatform(), new GPGDetachedSignatureVerifier());
+          BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
       ProgressListener progressListener = new ConsoleProgressListener();
 
       List<String> downloadedPackageIndexFiles = contributionInstaller.updateIndex(progressListener);
@@ -305,7 +316,12 @@ public class Base {
 
       ContributedPlatform selected = null;
       if (boardToInstallParts.length == 3) {
-        selected = indexer.getIndex().findPlatform(boardToInstallParts[0], boardToInstallParts[1], VersionHelper.valueOf(boardToInstallParts[2]).toString());
+        Optional<Version> version = VersionHelper.valueOf(boardToInstallParts[2]);
+        if (!version.isPresent()) {
+          System.out.println(format(tr("Invalid version {0}"), boardToInstallParts[2]));
+          System.exit(1);
+        }
+        selected = indexer.getIndex().findPlatform(boardToInstallParts[0], boardToInstallParts[1], version.get().toString());
       } else if (boardToInstallParts.length == 2) {
         List<ContributedPlatform> platformsByName = indexer.getIndex().findPlatforms(boardToInstallParts[0], boardToInstallParts[1]);
         Collections.sort(platformsByName, new DownloadableContributionVersionComparator());
@@ -346,7 +362,12 @@ public class Base {
 
         ContributedLibrary selected = null;
         if (libraryToInstallParts.length == 2) {
-          selected = indexer.getIndex().find(libraryToInstallParts[0], VersionHelper.valueOf(libraryToInstallParts[1]).toString());
+          Optional<Version> version = VersionHelper.valueOf(libraryToInstallParts[1]);
+          if (!version.isPresent()) {
+            System.out.println(format(tr("Invalid version {0}"), libraryToInstallParts[1]));
+            System.exit(1);
+          }
+          selected = indexer.getIndex().find(libraryToInstallParts[0], version.get().toString());
         } else if (libraryToInstallParts.length == 1) {
           List<ContributedLibrary> librariesByName = indexer.getIndex().find(libraryToInstallParts[0]);
           Collections.sort(librariesByName, new DownloadableContributionVersionComparator());
@@ -366,7 +387,7 @@ public class Base {
                       library, mayInstalled.get().getParsedVersion())));
           libraryInstaller.remove(mayInstalled.get(), progressListener);
         } else {
-          libraryInstaller.install(selected, mayInstalled, progressListener);
+          libraryInstaller.install(selected, progressListener);
         }
       }
 
@@ -450,7 +471,7 @@ public class Base {
         if (!parser.isForceSavePrefs())
           PreferencesData.setDoSave(true);
         if (handleOpen(file, retrieveSketchLocation(".default"), false) == null) {
-          String mess = I18n.format(tr("Failed to open sketch: \"{0}\""), path);
+          String mess = format(tr("Failed to open sketch: \"{0}\""), path);
           // Open failure is fatal in upload/verify mode
           if (parser.isVerifyOrUploadMode())
             showError(null, mess, 2);
@@ -746,7 +767,20 @@ public class Base {
     if (!newbieFile.createNewFile()) {
       throw new IOException();
     }
-    FileUtils.copyFile(new File(getContentFile("examples"), "01.Basics" + File.separator + "BareMinimum" + File.separator + "BareMinimum.ino"), newbieFile);
+
+    // Initialize the pde file with the BareMinimum sketch.
+    // Apply user-defined tab settings.
+    String sketch = FileUtils.readFileToString(
+        new File(getContentFile("examples"), "01.Basics" + File.separator
+            + "BareMinimum" + File.separator + "BareMinimum.ino"));
+    String currentTab = "  ";
+    String newTab = (PreferencesData.getBoolean("editor.tabs.expand")
+        ? StringUtils.repeat(" ",
+            PreferencesData.getInteger("editor.tabs.size"))
+        : "\t");
+    sketch = sketch.replaceAll(
+        "(?<=(^|\n)(" + currentTab + "){0,50})" + currentTab, newTab);
+    FileUtils.writeStringToFile(newbieFile, sketch);
     return newbieFile;
   }
 
@@ -910,46 +944,23 @@ public class Base {
    * @return true if succeeded in closing, false if canceled.
    */
   public boolean handleClose(Editor editor) {
-    // Check if modified
-//    boolean immediate = editors.size() == 1;
-    if (!editor.checkModified()) {
-      return false;
-    }
 
     if (editors.size() == 1) {
-      storeScreenDimensions();
-      storeSketches();
-
-      // This will store the sketch count as zero
-      editors.remove(editor);
-      try {
-        Editor.serialMonitor.close();
-      } catch (Exception e) {
-        //ignore
+      if (!handleQuit()) {
+        return false;
       }
-      rebuildRecentSketchesMenuItems();
-
-      // Save out the current prefs state
-      PreferencesData.save();
-
-      // Since this wasn't an actual Quit event, call System.exit()
-      System.exit(0);
-
+      // Everything called after handleQuit will only affect OSX
+      editor.setVisible(false);
+      editors.remove(editor);
     } else {
       // More than one editor window open,
       // proceed with closing the current window.
+      // Check if modified
+      if (!editor.checkModified()) {
+        return false;
+      }
       editor.setVisible(false);
       editor.dispose();
-//      for (int i = 0; i < editorCount; i++) {
-//        if (editor == editors[i]) {
-//          for (int j = i; j < editorCount-1; j++) {
-//            editors[j] = editors[j+1];
-//          }
-//          editorCount--;
-//          // Set to null so that garbage collection occurs
-//          editors[editorCount] = null;
-//        }
-//      }
       editors.remove(editor);
     }
     return true;
@@ -972,11 +983,19 @@ public class Base {
       // ignore
     }
 
+    // kill uploader (if still alive)
+    UploaderUtils uploaderInstance = new UploaderUtils();
+    Uploader uploader = uploaderInstance.getUploaderByPreferences(false);
+    if (uploader != null && uploader.programmerPid != null && uploader.programmerPid.isAlive()) {
+        // kill the stuck programmer
+        uploader.programmerPid.destroyForcibly();
+    }
+
     if (handleQuitEach()) {
       // Save out the current prefs state
       PreferencesData.save();
 
-      if (!OSUtils.hasMacOSStyleMenus()) {
+      if (!OSUtils.isMacOS()) {
         // If this was fired from the menu or an AppleEvent (the Finder),
         // then Mac OS X will send the terminate signal itself.
         System.exit(0);
@@ -1112,7 +1131,7 @@ public class Base {
             importMenu.addSeparator();
           }
           lastLibType = libType;
-          JMenuItem platformItem = new JMenuItem(I18n.format(tr("{0} libraries"), tr(lastLibType)));
+          JMenuItem platformItem = new JMenuItem(format(tr("{0} libraries"), tr(lastLibType)));
           platformItem.setEnabled(false);
           importMenu.add(platformItem);
         }
@@ -1123,7 +1142,7 @@ public class Base {
             try {
               activeEditor.getSketchController().importLibrary(l);
             } catch (IOException e) {
-              showWarning(tr("Error"), I18n.format("Unable to list header files in {0}", l.getSrcFolder()), e);
+              showWarning(tr("Error"), format("Unable to list header files in {0}", l.getSrcFolder()), e);
             }
           }
         };
@@ -1255,7 +1274,7 @@ public class Base {
     if (!platformLibs.isEmpty()) {
       menu.addSeparator();
       platformLibs.sort();
-      label = new JMenuItem(I18n.format(tr("Examples for {0}"), boardId));
+      label = new JMenuItem(format(tr("Examples for {0}"), boardId));
       label.setEnabled(false);
       menu.add(label);
       for (UserLibrary lib : platformLibs) {
@@ -1266,7 +1285,7 @@ public class Base {
     if (!referencedPlatformLibs.isEmpty()) {
       menu.addSeparator();
       referencedPlatformLibs.sort();
-      label = new JMenuItem(I18n.format(tr("Examples for {0}"), referencedPlatformName));
+      label = new JMenuItem(format(tr("Examples for {0}"), referencedPlatformName));
       label.setEnabled(false);
       menu.add(label);
       for (UserLibrary lib : referencedPlatformLibs) {
@@ -1288,6 +1307,7 @@ public class Base {
     if (!sketchbookIncompatibleLibs.isEmpty()) {
       sketchbookIncompatibleLibs.sort();
       JMenu incompatible = new JMenu(tr("INCOMPATIBLE"));
+      MenuScroller.setScrollerFor(incompatible);
       menu.add(incompatible);
       for (UserLibrary lib : sketchbookIncompatibleLibs) {
         addSketchesSubmenu(incompatible, lib);
@@ -1432,16 +1452,15 @@ public class Base {
     boardMenu.add(new JSeparator());
 
     // Generate custom menus for all platforms
-    Set<String> customMenusTitles = new LinkedHashSet<>();
     for (TargetPackage targetPackage : BaseNoGui.packages.values()) {
       for (TargetPlatform targetPlatform : targetPackage.platforms()) {
-        customMenusTitles.addAll(targetPlatform.getCustomMenus().values());
+        for (String customMenuTitle : targetPlatform.getCustomMenus().values()) {
+          JMenu customMenu = new JMenu(tr(customMenuTitle));
+          customMenu.putClientProperty("platform", getPlatformUniqueId(targetPlatform));
+          customMenu.putClientProperty("removeOnWindowDeactivation", true);
+          boardsCustomMenus.add(customMenu);
+        }
       }
-    }
-    for (String customMenuTitle : customMenusTitles) {
-      JMenu customMenu = new JMenu(tr(customMenuTitle));
-      customMenu.putClientProperty("removeOnWindowDeactivation", true);
-      boardsCustomMenus.add(customMenu);
     }
 
     List<JMenuItem> menuItemsToClickAfterStartup = new LinkedList<>();
@@ -1491,6 +1510,10 @@ public class Base {
     }
   }
 
+  private String getPlatformUniqueId(TargetPlatform platform) {
+    return platform.getId() + "_" + platform.getFolder();
+  }
+
   private JRadioButtonMenuItem createBoardMenusAndCustomMenus(
           final List<JMenu> boardsCustomMenus, List<JMenuItem> menuItemsToClickAfterStartup,
           Map<String, ButtonGroup> buttonGroupsMap,
@@ -1528,7 +1551,7 @@ public class Base {
     PreferencesMap customMenus = targetPlatform.getCustomMenus();
     for (final String menuId : customMenus.keySet()) {
       String title = customMenus.get(menuId);
-      JMenu menu = getBoardCustomMenu(tr(title));
+      JMenu menu = getBoardCustomMenu(tr(title), getPlatformUniqueId(targetPlatform));
 
       if (board.hasMenu(menuId)) {
         PreferencesMap boardCustomMenu = board.getMenuLabels(menuId);
@@ -1536,11 +1559,16 @@ public class Base {
           @SuppressWarnings("serial")
           Action subAction = new AbstractAction(tr(boardCustomMenu.get(customMenuOption))) {
             public void actionPerformed(ActionEvent e) {
-              PreferencesData.set("custom_" + menuId, ((TargetBoard) getValue("board")).getId() + "_" + getValue("custom_menu_option"));
+              PreferencesData.set("custom_" + menuId, ((List<TargetBoard>) getValue("board")).get(0).getId() + "_" + getValue("custom_menu_option"));
               onBoardOrPortChange();
             }
           };
-          subAction.putValue("board", board);
+          List<TargetBoard> boards = (List<TargetBoard>) subAction.getValue("board");
+          if (boards == null) {
+            boards = new ArrayList<TargetBoard>();
+          }
+          boards.add(board);
+          subAction.putValue("board", boards);
           subAction.putValue("custom_menu_option", customMenuOption);
 
           if (!buttonGroupsMap.containsKey(menuId)) {
@@ -1568,7 +1596,9 @@ public class Base {
       JMenu menu = boardsCustomMenus.get(i);
       for (int m = 0; m < menu.getItemCount(); m++) {
         JMenuItem menuItem = menu.getItem(m);
-        menuItem.setVisible(menuItem.getAction().getValue("board").equals(board));
+        for (TargetBoard t_board : (List<TargetBoard>)menuItem.getAction().getValue("board")) {
+          menuItem.setVisible(t_board.equals(board));
+        }
       }
       menu.setVisible(ifThereAreVisibleItemsOn(menu));
 
@@ -1591,9 +1621,9 @@ public class Base {
     return false;
   }
 
-  private JMenu getBoardCustomMenu(String label) throws Exception {
+  private JMenu getBoardCustomMenu(String label, String platformUniqueId) throws Exception {
     for (JMenu menu : boardsCustomMenus) {
-      if (label.equals(menu.getText())) {
+      if (label.equals(menu.getText()) && menu.getClientProperty("platform").equals(platformUniqueId)) {
         return menu;
       }
     }
@@ -1687,19 +1717,12 @@ public class Base {
     });
 
     boolean ifound = false;
-
     for (File subfolder : files) {
-      if (FileUtils.isSCCSOrHiddenFile(subfolder)) {
-        continue;
-      }
-
-      if (!subfolder.isDirectory()) continue;
-
-      if (addSketchesSubmenu(menu, subfolder.getName(), subfolder)) {
+      if (!FileUtils.isSCCSOrHiddenFile(subfolder) && subfolder.isDirectory()
+          && addSketchesSubmenu(menu, subfolder.getName(), subfolder)) {
         ifound = true;
       }
     }
-
     return ifound;
   }
 
@@ -1784,7 +1807,7 @@ public class Base {
           try {
             activeEditor.getSketchController().importLibrary(l);
           } catch (IOException e) {
-            showWarning(tr("Error"), I18n.format("Unable to list header files in {0}", l.getSrcFolder()), e);
+            showWarning(tr("Error"), format("Unable to list header files in {0}", l.getSrcFolder()), e);
           }
         }
       };
@@ -1873,6 +1896,74 @@ public class Base {
     getEditors().forEach(Editor::applyPreferences);
   }
 
+  /**
+   * Adds a {@link MouseWheelListener} and {@link KeyListener} to the given
+   * component that will make "CTRL scroll" and "CTRL +/-"
+   * (with optional SHIFT for +) increase/decrease the editor text size.
+   * This method is equivalent to calling
+   * {@link #addEditorFontResizeMouseWheelListener(Component)} and
+   * {@link #addEditorFontResizeKeyListener(Component)} on the given component.
+   * Note that this also affects components that use the editor font settings.
+   * @param comp - The component to add the listener to.
+   */
+  public void addEditorFontResizeListeners(Component comp) {
+    addEditorFontResizeMouseWheelListener(comp);
+    addEditorFontResizeKeyListener(comp);
+  }
+
+  /**
+   * Adds a {@link MouseWheelListener} to the given component that will
+   * make "CTRL scroll" increase/decrease the editor text size.
+   * When CTRL is not pressed while scrolling, mouse wheel events are passed
+   * on to the parent of the given component.
+   * Note that this also affects components that use the editor font settings.
+   * @param comp - The component to add the listener to.
+   */
+  public void addEditorFontResizeMouseWheelListener(Component comp) {
+    comp.addMouseWheelListener(e -> {
+      if (e.isControlDown()) {
+        if (e.getWheelRotation() < 0) {
+          this.handleFontSizeChange(1);
+        } else {
+          this.handleFontSizeChange(-1);
+        }
+      } else {
+        if (e.getComponent() != null && e.getComponent().getParent() != null) {
+          e.getComponent().getParent().dispatchEvent(e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Adds a {@link KeyListener} to the given component that will make "CTRL +/-"
+   * (with optional SHIFT for +) increase/decrease the editor text size.
+   * Note that this also affects components that use the editor font settings.
+   * @param comp - The component to add the listener to.
+   */
+  public void addEditorFontResizeKeyListener(Component comp) {
+    comp.addKeyListener(new KeyAdapter() {
+      @Override
+      public void keyPressed(KeyEvent e) {
+        if (e.getModifiersEx() == KeyEvent.CTRL_DOWN_MASK
+            || e.getModifiersEx() == (KeyEvent.CTRL_DOWN_MASK
+                                      | KeyEvent.SHIFT_DOWN_MASK)) {
+          switch (e.getKeyCode()) {
+          case KeyEvent.VK_PLUS:
+          case KeyEvent.VK_EQUALS:
+            Base.this.handleFontSizeChange(1);
+            break;
+          case KeyEvent.VK_MINUS:
+            if (!e.isShiftDown()) {
+              Base.this.handleFontSizeChange(-1);
+            }
+            break;
+          }
+        }
+      }
+    });
+  }
+
   public List<JMenu> getBoardsCustomMenus() {
     return boardsCustomMenus;
   }
@@ -1934,10 +2025,9 @@ public class Base {
   static public void openURL(String url) {
     try {
       BaseNoGui.getPlatform().openURL(url);
-
     } catch (Exception e) {
       showWarning(tr("Problem Opening URL"),
-              I18n.format(tr("Could not open the URL\n{0}"), url), e);
+                  format(tr("Could not open the URL\n{0}"), url), e);
     }
   }
 
@@ -1959,10 +2049,9 @@ public class Base {
   static public void openFolder(File file) {
     try {
       BaseNoGui.getPlatform().openFolder(file);
-
     } catch (Exception e) {
       showWarning(tr("Problem Opening Folder"),
-              I18n.format(tr("Could not open the folder\n{0}"), file.getAbsolutePath()), e);
+                  format(tr("Could not open the folder\n{0}"), file.getAbsolutePath()), e);
     }
   }
 
@@ -2040,7 +2129,7 @@ public class Base {
     if(referenceFile.exists()){
       openURL(referenceFile.getAbsolutePath());
     }else{
-      showWarning(tr("Problem Opening URL"), I18n.format(tr("Could not open the URL\n{0}"), referenceFile), null);
+      showWarning(tr("Problem Opening URL"), format(tr("Could not open the URL\n{0}"), referenceFile), null);
     }
   }
 
@@ -2296,7 +2385,7 @@ public class Base {
 
       String libName = libFolder.getName();
       if (!BaseNoGui.isSanitaryName(libName)) {
-        String mess = I18n.format(tr("The library \"{0}\" cannot be used.\n"
+        String mess = format(tr("The library \"{0}\" cannot be used.\n"
                         + "Library names must contain only basic letters and numbers.\n"
                         + "(ASCII only and no spaces, and it cannot start with a number)"),
                 libName);
@@ -2320,7 +2409,7 @@ public class Base {
       // copy folder
       File destinationFolder = new File(BaseNoGui.getSketchbookLibrariesFolder().folder, sourceFile.getName());
       if (!destinationFolder.mkdir()) {
-        activeEditor.statusError(I18n.format(tr("A library named {0} already exists"), sourceFile.getName()));
+        activeEditor.statusError(format(tr("A library named {0} already exists"), sourceFile.getName()));
         return;
       }
       try {

@@ -24,6 +24,8 @@
 # You'll have problems running Processing if you incorrectly 
 # modify lines in that file.
 
+# This file DOES NOT CONTAIN settings for autoformatter (A-Style).
+# Look for the file "formatter.conf" and follow instructions at top.
 
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -267,8 +269,8 @@ programmer = arduino:avrispmkii
 upload.using = bootloader
 upload.verify = true
 
-#default port is empty to prevent running AVRDUDE before Port selected (issue #7943)
-serial.port=
+# default port is not defined to prevent running AVRDUDE before Port selected (issue #7943)
+#serial.port=
 serial.databits=8
 serial.stopbits=1
 serial.parity=N
