@@ -5,7 +5,7 @@
 //
 //  Author :  Stefan Schauer
 //  Date   :  Mar 05, 2015
-//  Version:  1.04
+//  Version:  1.05
 //  File   :  LCD_SharpBoosterPack_SPI_main.h
 //
 //  Based on the LCD5110 Library
@@ -25,6 +25,10 @@
 //  Added support for CC13xx to support low power consuption
 //  Added powerSave() function
 //  Replaced OneMsTimer with RTOS function if available
+//
+//  Edited 2020-05-04 by Rei Vilo
+//  Added horrible patch for CC13x0
+//  Tested against CC1352 and CC1350 LaunchPad boards
 //
 
 #ifndef LCD_SharpBoosterPack_SPI_h

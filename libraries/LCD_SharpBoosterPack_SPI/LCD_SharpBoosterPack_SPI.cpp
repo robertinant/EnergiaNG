@@ -116,7 +116,7 @@ LCD_SharpBoosterPack_SPI::LCD_SharpBoosterPack_SPI(uint8_t pinChipSelect, uint8_
     _pinVCC  = pinVCC;
     _autoVCOM = autoVCOM;
 
-    digitalWrite(RED_LED, HIGH);
+    
     lcd_vertical_max = model;
     lcd_horizontal_max = model;
 }
@@ -576,28 +576,33 @@ static void SendToggleVCOMCommand(UArg arg)
         unsigned char command = SHARP_LCD_CMD_CHANGE_VCOM;
         command |= VCOMbit;                    //COM inversion bit
 
-        if (LCDPowerMode == LCDPowerSaveOn)
-		{
-            // enable SPI first
-			SPI.begin();
-		}
-
         // Set P2.4 High for CS
         digitalWrite(_pinChipSelect, HIGH);
+        
+#if defined(ENERGIA_ARCH_CC13XX) // Horrible patch for CC13x0
+        shiftOut(15, 7, MSBFIRST, (char)command);
+        shiftOut(15, 7, MSBFIRST, (char)SHARP_LCD_TRAILER_BYTE);
+#else
+        if (LCDPowerMode == LCDPowerSaveOn)
+        {
+            // enable SPI first
+            SPI.begin();
+        }
 
         SPI.transfer((char)command);
         SPI.transfer((char)SHARP_LCD_TRAILER_BYTE);
 
+        if (LCDPowerMode == LCDPowerSaveOn)
+        {
+            // disable SPI again
+            SPI.end();
+        }
+#endif
+        
         // Wait for last byte to be sent, then drop SCS
         delayMicroseconds(10);
         // Set P2.4 High for CS
         digitalWrite(_pinChipSelect, LOW);
-
-        if (LCDPowerMode == LCDPowerSaveOn)
-		{
-			// disable SPI again
-			SPI.end();
-		}
 
         // clear request flag
         flagSendToggleVCOMCommand &= ~SHARP_REQUEST_TOGGLE_VCOM;
