@@ -39,28 +39,20 @@ void setup()
 
     for (i=1;i<=40; i++)
     {
-        //DIO20 - 32  -- Flash_CS   -- PULLUP on Board
+        //DIO20 - 38  -- Flash_CS   -- PULLUP on Board
         //DIO5  - 10  -- SDA        -- PULLUP on Board
         //DIO22 -  5  -- SDL        -- PULLUP on Board
         //DIO12 -  3  -- RX         -- PULLUP on Board
-        //DIO13 -  4  -- TX         -- PULLDO on Board
+        //DIO13 -  4  -- TX         -- PULLDOWN on Board
         //DIO13 -  7  -- SCLK       -- LCD
         //DIO13 - 14  -- MISO       -- LCD
         //DIO13 - 15  -- MOSI       -- LCD
 
 
-        if (i != 2 && i != 3 && i != 4 && i != 5 && i != 7 && i != 10 && i != 14  && i != 15 && i != 32)
+        if (i != 2 && i != 3 && i != 5 && i != 7 && i != 10 && i != 14  && i != 15 && i != 38){
         pinMode(i, INPUT_PULLDOWN);
+        }
     }
-    pinMode(4, INPUT_PULLDOWN);  // TX
-
-    //Sharp
-    //         2  -- DISP Power  - 1
-    //         5  -- LCD_DISP_ON - 1
-    pinMode(2, OUTPUT);
-    digitalWrite(2, HIGH);
-    pinMode(5, OUTPUT);
-    digitalWrite(5, HIGH);
 
 
     myScreen.begin();
