@@ -10,7 +10,7 @@
 //
 //  Based on the LCD5110 Library
 //  Created by Rei VILO on 28 May 2012
-//  Copyright (c) 2012 http://embeddedcomputing.weebly.com
+//  Copyright (c) 2012 https://embeddedcomputing.weebly.com
 //  Licence CC = BY SA NC
 //
 //  Edited 11 Jul 2015 by ReiVilo
@@ -159,18 +159,28 @@ class LCD_SharpBoosterPack_SPI : public Print
     uint8_t getSize();
 
     ///
-    /// @brief    PowerSave mode. Disables the SPI module and enalbes/disables it for any following transfer
-    /// @return   -
+    /// @brief    PowerSave mode
+    /// @details  Turn SPI module on / off
+    /// @param    mode default=HIGH=SPI on, LOW=SPI off
+    /// @note     AutoLowPowerMode is desactivated
     ///
-    void powerSave(tLCDPowerModeType);
+    void setManualPowerMode(bool mode = HIGH);
 
+    ///
+    /// @brief    Set automatic low power mode
+    /// @param    mode default=true
+    /// @note     If another device on the SPI bus,
+    ///           use manual setManualPowerMode() instead
+    /// @note     Desactivated by setManualPowerMode()
+    ///
+    void setAutoLowPowerMode(bool mode = true);
 
     void setLineSpacing(uint8_t pixel);
     void setXY(uint8_t x, uint8_t y, uint8_t ulValue);
     //void text(uint8_t x, uint8_t y, String s);
     void text(uint8_t x, uint8_t y, String s, tLCDWrapType wrap = LCDWrapNextLine);
     void text(uint8_t x, uint8_t y, uint8_t c) ;
-    
+
     ///
     /// @brief  Send to buffer to the screen
     /// @note   flush() preserves the buffer
