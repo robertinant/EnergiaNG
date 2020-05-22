@@ -90,6 +90,8 @@ uint8_t texty = 0;
 uint8_t textstartx = 0;
 uint8_t textstarty = 0;
 uint8_t lineSpacing[NUM_OF_FONTS] = {9, 16};
+uint8_t lcd_vertical_max;
+uint8_t lcd_horizontal_max;
 
 tLCDPowerModeType LCDPowerMode = LCDPowerSaveOff;
 

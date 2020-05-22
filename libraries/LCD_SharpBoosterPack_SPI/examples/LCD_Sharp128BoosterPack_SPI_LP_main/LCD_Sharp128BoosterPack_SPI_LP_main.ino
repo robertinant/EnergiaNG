@@ -1,21 +1,21 @@
 //
-//  Sharp128 BoosterPackLCD SPI with Low Power Feature - esp. for CC13xx
+//  Sharp128 BoosterPackLCD SPI Low Power Demo
 //  Example for library for Sharp BoosterPack LCD with hardware SPI
 //
 //
 //  Author :  Stefan Schauer
-//  Date   :  May 02, 2020
+//  Date   : May. 05, 2020
 //  Version:  1.00
-//  File   :  LCD_Sharp128BoosterPack_SPI_main.ino
+//  File   :  LCD_Sharp128BoosterPack_SPI_LP_main.ino
 //
-//  Version:  1.00 : Demo with init all pins and no UART to show low power demo
+//  Version:  1.00 : setup for Sharp128 Booster pack based on Sharp96 example
 //
 //  Based on the LCD5110 Library
 //  Created by Rei VILO on 28/05/12
 //  Copyright (c) 2012 http://embeddedcomputing.weebly.com
 //  Licence CC = BY SA NC
 //
-//
+
 
 // Include application, user and local libraries
 #include "SPI.h"
@@ -35,7 +35,6 @@ uint16_t myCount = 0;
 void setup()
 {
     int i;
-//    Serial.begin(9600);
 
     for (i=1;i<=40; i++)
     {
@@ -50,13 +49,11 @@ void setup()
 
 
         if (i != 2 && i != 3 && i != 5 && i != 7 && i != 10 && i != 14  && i != 15 && i != 38){
-        pinMode(i, INPUT_PULLDOWN);
+            pinMode(i, INPUT_PULLDOWN);
         }
     }
 
 
-    myScreen.begin();
-    myScreen.end();
     myScreen.begin();
     myScreen.clearBuffer();
 
@@ -86,26 +83,18 @@ void setup()
     {
         delay(100);
     }
-
-    //Serial.print("myCount = ");
 }
 
 // Add loop code
 void loop()
 {
     myCount++;
-    //Serial.print(-myCount, DEC);
     if (myCount > 16)
     {
         myOrientation++;
-//       if (myOrientation > 4) myOrientation = 0;
         myOrientation %= 4;
         myScreen.setOrientation(myOrientation);
         myCount = 0;
-        //Serial.println();
-        //Serial.print("** myOrientation = ");
-        //Serial.println(myOrientation, DEC);
-        //Serial.print("myCount = ");
     }
     myScreen.clearBuffer();
     myScreen.setFont(0);
@@ -121,14 +110,8 @@ void loop()
     for (uint8_t i = 0; i <= 20; i++)
     {
         myScreen.setXY(50 + i, 30, 1);
-        //    }
-        //    for (uint8_t i=0; i<=20; i++) {
         myScreen.setXY(50, 30 + i, 1);
-        //    }
-        //    for (uint8_t i=0; i<=20; i++) {
         myScreen.setXY(50 + i, 50, 1);
-        //    }
-        //    for (uint8_t i=0; i<=20; i++) {
         myScreen.setXY(70, 30 + i, 1);
     }
 
@@ -145,7 +128,7 @@ void loop()
     myScreen.flush();
 
     myScreen.powerSave(LCDPowerSaveOn);
-    delay(5000);
+    delay(30000);  // power down for 30 seconds
     myScreen.powerSave(LCDPowerSaveOff);
 
 }

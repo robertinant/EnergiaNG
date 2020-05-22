@@ -197,8 +197,6 @@ class LCD_SharpBoosterPack_SPI : public Print
     void LCD_turnOff();
     uint8_t _orientation;
     bool _reverse;
-    uint8_t lcd_vertical_max;
-    uint8_t lcd_horizontal_max;
 };
 #endif
 
