@@ -80,7 +80,7 @@ unsigned char flagSendToggleVCOMCommand = 0;
 
 
 #if !defined(ti_sysbios_BIOS___VERS)
-static void SendToggleVCOMCommand(uint32_t arg);
+static void SendToggleVCOMCommand();
 #else
 Clock_Struct clk0Struct;
 static void SendToggleVCOMCommand(UArg arg);
@@ -495,7 +495,11 @@ void LCD_SharpBoosterPack_SPI::flush(void)
     digitalWrite(_pinChipSelect, LOW);
     // clear flag to indicate command transmit is free
     flagSendToggleVCOMCommand &= ~SHARP_SEND_COMMAND_RUNNING;
+#if !defined(ti_sysbios_BIOS___VERS)
+    SendToggleVCOMCommand();  // send toggle if required
+#else
     SendToggleVCOMCommand(0); // send toggle if required
+#endif
 
     if (LCDPowerMode == LCDPowerSaveOn)
     {
@@ -545,7 +549,11 @@ void LCD_SharpBoosterPack_SPI::flushReversed(void)
     digitalWrite(_pinChipSelect, LOW);
     // clear flag to indicate command transmit is free
     flagSendToggleVCOMCommand &= ~SHARP_SEND_COMMAND_RUNNING;
+#if !defined(ti_sysbios_BIOS___VERS)
+    SendToggleVCOMCommand();  // send toggle if required
+#else
     SendToggleVCOMCommand(0); // send toggle if required
+#endif
     if (LCDPowerMode == LCDPowerSaveOn)
     {
         // enable SPI first
@@ -564,7 +572,7 @@ void LCD_SharpBoosterPack_SPI::powerSave(tLCDPowerModeType mode)
 
 
 #if !defined(ti_sysbios_BIOS___VERS)
-static void SendToggleVCOMCommand(uint32_t arg)
+static void SendToggleVCOMCommand()
 #else
 static void SendToggleVCOMCommand(UArg arg)
 #endif
