@@ -87,7 +87,45 @@ uint8_t textstartx = 0;
 uint8_t textstarty = 0;
 uint8_t lineSpacing[NUM_OF_FONTS] = {9, 16};
 
-tLCDPowerModeType LCDPowerMode = LCDPowerSaveOff;
+//tLCDPowerModeType LCDPowerMode = LCDPowerSaveOff;
+
+///
+/// @brief    Automatic power management
+///
+bool LCD_auto_ulp = false;
+
+///
+/// @brief    SPI state security
+/// @note     Double SPI.begin() crashes
+///
+bool LCD_spi_state = false;
+
+///
+/// @brief    Enable SPI with security
+///
+void spi_begin()
+{
+    if (LCD_spi_state == false)
+    {
+        SPI.begin();
+        // SPI.setClockDivider(SPI_CLOCK_DIV2);
+        SPI.setBitOrder(MSBFIRST);
+        SPI.setDataMode(SPI_MODE0);
+        LCD_spi_state = true;
+    }
+}
+
+///
+/// @brief    Diable SPI with security
+///
+void spi_end()
+{
+    if (LCD_spi_state == true)
+    {
+        SPI.end();
+        LCD_spi_state = false;
+    }
+}
 
 uint16_t LCD_SharpBoosterPack_SPI::_index(uint8_t x, uint8_t y)
 {
@@ -116,7 +154,6 @@ LCD_SharpBoosterPack_SPI::LCD_SharpBoosterPack_SPI(uint8_t pinChipSelect, uint8_
     _pinVCC  = pinVCC;
     _autoVCOM = autoVCOM;
 
-    digitalWrite(RED_LED, HIGH);
     lcd_vertical_max = model;
     lcd_horizontal_max = model;
 }
@@ -206,10 +243,7 @@ void LCD_SharpBoosterPack_SPI::setXY(uint8_t x, uint8_t y, uint8_t  ulValue)
 
 void LCD_SharpBoosterPack_SPI::begin()
 {
-    SPI.begin();
-    //SPI.setClockDivider(SPI_CLOCK_DIV2);
-    SPI.setBitOrder(MSBFIRST);
-    SPI.setDataMode(SPI_MODE0);
+    spi_begin();
 
     pinMode(_pinChipSelect, OUTPUT);
     pinMode(_pinDISP, OUTPUT);
@@ -233,7 +267,7 @@ void LCD_SharpBoosterPack_SPI::begin()
 
 void LCD_SharpBoosterPack_SPI::end()
 {
-	LCD_turnOff();
+    LCD_turnOff();
 }
 
 
@@ -455,10 +489,10 @@ void LCD_SharpBoosterPack_SPI::flush(void)
     //image update mode(1X000000b)
     unsigned char command = SHARP_LCD_CMD_WRITE_LINE;
 
-    if (LCDPowerMode == LCDPowerSaveOn)
+    // Explicit double condition
+    if (LCD_auto_ulp or !LCD_spi_state)
     {
-        // enable SPI first
-        SPI.begin();
+        spi_begin();        // enable SPI first
     }
 
     // set flag to indicate command transmit is running
@@ -489,12 +523,10 @@ void LCD_SharpBoosterPack_SPI::flush(void)
     flagSendToggleVCOMCommand &= ~SHARP_SEND_COMMAND_RUNNING;
     SendToggleVCOMCommand(0); // send toggle if required
 
-    if (LCDPowerMode == LCDPowerSaveOn)
+    if (LCD_auto_ulp)
     {
-        // enable SPI first
-        SPI.end();
+        spi_end();        // disable SPI
     }
-
 }
 
 void LCD_SharpBoosterPack_SPI::flushReversed(void)
@@ -505,53 +537,62 @@ void LCD_SharpBoosterPack_SPI::flushReversed(void)
     //image update mode(1X000000b)
     unsigned char command = SHARP_LCD_CMD_WRITE_LINE;
 
-    if (LCDPowerMode == LCDPowerSaveOn)
+    // Explicit double condition
+    if (LCD_auto_ulp or !LCD_spi_state)
     {
-        // enable SPI first
-        SPI.begin();
+        spi_begin();        // enable SPI first
     }
-    
+
     // set flag to indicate command transmit is running
     flagSendToggleVCOMCommand |= SHARP_SEND_COMMAND_RUNNING;
     //COM inversion bit
     command |= VCOMbit;
     // Set P2.4 High for CS
     digitalWrite(_pinChipSelect, HIGH);
-    
+
     SPI.transfer((char)command);
     for (xj = 0; xj < lcd_vertical_max; xj++)
     {
         SPI.transfer((char)reverse(xj + 1));
-        
+
         for (xi = 0; xi < (lcd_horizontal_max >> 3); xi++)
         {
-            SPI.transfer(0xff ^((char) * (pucData++)));
+            SPI.transfer(0xff ^ ((char) * (pucData++)));
         }
         SPI.transfer(SHARP_LCD_TRAILER_BYTE);
     }
-    
+
     SPI.transfer((char)SHARP_LCD_TRAILER_BYTE);
     delayMicroseconds(10);
-    
+
     // Set P2.4 Low for CS
     digitalWrite(_pinChipSelect, LOW);
     // clear flag to indicate command transmit is free
     flagSendToggleVCOMCommand &= ~SHARP_SEND_COMMAND_RUNNING;
     SendToggleVCOMCommand(0); // send toggle if required
-    if (LCDPowerMode == LCDPowerSaveOn)
+
+    if (LCD_auto_ulp)
     {
-        // enable SPI first
-        SPI.end();
+        spi_end();        // disable SPI
     }
 }
 
-void LCD_SharpBoosterPack_SPI::powerSave(tLCDPowerModeType mode)
+void LCD_SharpBoosterPack_SPI::setAutoLowPowerMode(bool mode)
 {
-    if (LCDPowerMode == LCDPowerSaveOn && mode == LCDPowerSaveOff)
+    LCD_auto_ulp = mode;
+}
+
+void LCD_SharpBoosterPack_SPI::setManualPowerMode(bool mode)
+{
+    LCD_auto_ulp = false;
+    if (mode == HIGH)
     {
-        SPI.begin();
+        spi_begin();
     }
-    LCDPowerMode = mode;
+    else
+    {
+        spi_end();
+    }
 }
 
 
@@ -576,28 +617,34 @@ static void SendToggleVCOMCommand(UArg arg)
         unsigned char command = SHARP_LCD_CMD_CHANGE_VCOM;
         command |= VCOMbit;                    //COM inversion bit
 
-        if (LCDPowerMode == LCDPowerSaveOn)
-		{
-            // enable SPI first
-			SPI.begin();
-		}
-
         // Set P2.4 High for CS
         digitalWrite(_pinChipSelect, HIGH);
 
+        // Horrible patch for CC13x0
+#if defined(ENERGIA_ARCH_CC13XX)
+        /// @note Use shiftOut(dataPin, clockPin, bitOrder, value)
+        shiftOut(15, 7, MSBFIRST, (char)command);
+        shiftOut(15, 7, MSBFIRST, (char)SHARP_LCD_TRAILER_BYTE);
+#else
+        if (LCD_auto_ulp or !LCD_spi_state)
+        {
+            spi_begin();        // enable SPI first
+        }
+        /// @bug Those two lines freeze on the CC1350 regardless of next bug.
+        /// @bug Those two lines freeze the process if SPI is off.
         SPI.transfer((char)command);
         SPI.transfer((char)SHARP_LCD_TRAILER_BYTE);
+
+        if (LCD_auto_ulp)
+        {
+            spi_end();        // disable SPI
+        }
+#endif
 
         // Wait for last byte to be sent, then drop SCS
         delayMicroseconds(10);
         // Set P2.4 High for CS
         digitalWrite(_pinChipSelect, LOW);
-
-        if (LCDPowerMode == LCDPowerSaveOn)
-		{
-			// disable SPI again
-			SPI.end();
-		}
 
         // clear request flag
         flagSendToggleVCOMCommand &= ~SHARP_REQUEST_TOGGLE_VCOM;
@@ -624,11 +671,11 @@ void LCD_SharpBoosterPack_SPI::LCD_enableVCOMToggle()
     clockTickPeriod =  Clock_tickPeriod;
     Clock_Params_init(&clkParams);
     clkParams.startFlag = TRUE;
-    clkParams.period = 1000*1000/clockTickPeriod;
+    clkParams.period = 1000 * 1000 / clockTickPeriod;
 
-     /* Construct a periodic Clock Instance with period = 2 system time units */
-     Clock_construct(&clk0Struct, (Clock_FuncPtr)SendToggleVCOMCommand,
-                     clkParams.period, &clkParams);
+    /* Construct a periodic Clock Instance with period = 2 system time units */
+    Clock_construct(&clk0Struct, (Clock_FuncPtr)SendToggleVCOMCommand,
+                    clkParams.period, &clkParams);
 #endif
 
 
