@@ -3,7 +3,7 @@
 //  Example for library for Sharp BoosterPack LCD 96 and 128 with hardware SPI
 //
 //
-//  Author :  Stefan Schauer
+//  Author :  StefanSch
 //  Date   :  Mar 05, 2015
 //  Version:  1.05
 //  File   :  LCD_SharpBoosterPack_SPI_main.h
@@ -20,6 +20,9 @@
 //  Edited 15 Oct 2018 by ReiVilo
 //  Added support for Sharp 128 with minimal change
 //  Added flushReversed() for reversed display and preserved buffer
+//
+//  Edited 2019-03-19 by StefaSch
+//  Added support for smaller memory with put LCD data to FRAM
 //
 //  Edited 2020-05-02 by StefanSch
 //  Added support for CC13xx to support low power consuption
@@ -154,7 +157,7 @@ class LCD_SharpBoosterPack_SPI : public Print
 
     ///
     /// @brief    Get size àf the screen
-    /// @return   96 for 96x96 or &28 for 128x128
+    /// @return   96 for 96x96 or 128 for 128x128
     ///
     uint8_t getSize();
 
@@ -208,8 +211,6 @@ class LCD_SharpBoosterPack_SPI : public Print
     void LCD_turnOff();
     uint8_t _orientation;
     bool _reverse;
-    uint8_t lcd_vertical_max;
-    uint8_t lcd_horizontal_max;
 };
 #endif
 

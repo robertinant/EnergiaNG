@@ -3,19 +3,21 @@
 //  Example for library for Sharp BoosterPack LCD with hardware SPI
 //
 //
-//  Author :  Stefan Schauer
+//  Author :  StefanSch
 //  Date   :  Mar 05, 2015
-//  Version:  1.04
+//  Version:  1.05
 //  File   :  LCD_SharpBoosterPack_SPI_main.c
 //
 //  Version:  1.01 : added support for CC3200
 //  Version:  1.02 : added print class
 //  Version:  1.03 : added support for Sharp 128
-//  Version:  1.04 : added hooks for CC13xx devices to get low power consumption
+//  Version:  1.04 : added support for Data in FRAM
+//                   horrible patch for CC13x0 ENERGIA_ARCH_CC13XX
+//  Version:  1.05 : added hooks for CC13xx devices to get low power consumption
 //
 //  Based on the LCD5110 Library
 //  Created by Rei VILO on 28/05/12
-//  Copyright (c) 2012 http://embeddedcomputing.weebly.com
+//  Copyright (c) 2012 https://embeddedcomputing.weebly.com
 //  Licence CC = BY SA NC
 //
 //  Edited 2015-07-11 by ReiVilo
@@ -27,7 +29,10 @@
 //  Added flushReversed() for reversed display and preserved buffer
 //  Simplified Clear function
 //
-//  Edited 2020-05-02 by StefanSch
+//  Edited 2019-03-19 by StefaSch
+//  Added support for smaller memory with put LCD data to FRAM
+//
+//  Edited 2020-05-02 by StefanSch / Rei VILO 
 //  Added support for CC13xx to support low power consuption
 //  Added powerSave() function
 //  Replaced OneMsTimer with RTOS function if available
@@ -46,11 +51,11 @@ uint8_t _pinSerialClock;
 bool    _autoVCOM;
 
 // Booster Pack Pins
-//  7 - P2.2 for SPI_CLK mode
-// 15 - P1.6 for SPI_SIMO mode
-//  6 - P2.4 output pin for SPI_CS
-//  2 - P4.2 as output to supply the LCD
-//  5 - P4.3 as output for DISP
+//  7 - SPI_CLK mode
+// 15 - SPI_SIMO mode
+//  6 - output pin for SPI_CS
+//  2 - output to supply the LCD
+//  5 - output for DISP
 // Set display's VCC and DISP pins to high
 
 
@@ -75,12 +80,14 @@ unsigned char flagSendToggleVCOMCommand = 0;
 
 
 #if !defined(ti_sysbios_BIOS___VERS)
-static void SendToggleVCOMCommand(uint32_t arg);
+static void SendToggleVCOMCommand();
 #else
 Clock_Struct clk0Struct;
 static void SendToggleVCOMCommand(UArg arg);
 #endif
 
+static uint8_t lcd_vertical_max;
+static uint8_t lcd_horizontal_max;
 uint8_t textx = 0;
 uint8_t texty = 0;
 uint8_t textstartx = 0;
@@ -134,18 +141,19 @@ uint16_t LCD_SharpBoosterPack_SPI::_index(uint8_t x, uint8_t y)
 
 LCD_SharpBoosterPack_SPI::LCD_SharpBoosterPack_SPI(uint8_t model)
 {
-    _pinChipSelect  = P_CS;
-    _pinDISP = P_DISP;
-    _pinVCC  = P_VCC;
-    _autoVCOM = true;
-
-    lcd_vertical_max = model;
-    lcd_horizontal_max = model;
-
-    static uint8_t * _frameBuffer;
-    _frameBuffer = new uint8_t[_index(lcd_vertical_max, lcd_horizontal_max)];
-    DisplayBuffer = (uint8_t *) _frameBuffer;
+    LCD_SharpBoosterPack_SPI(P_CS, P_DISP, P_VCC, true, model);
 }
+
+LCD_SharpBoosterPack_SPI::LCD_SharpBoosterPack_SPI(uint8_t pinChipSelect, uint8_t pinDISP, uint8_t pinVCC, uint8_t model)
+{
+    LCD_SharpBoosterPack_SPI(pinChipSelect, pinDISP, pinVCC, true, model);
+}
+
+#ifdef PLACE_IN_FRAM
+    uint8_t _frameBuffer[128][128/8] PLACE_IN_FRAM;
+#else
+    uint8_t * _frameBuffer = 0;
+#endif
 
 LCD_SharpBoosterPack_SPI::LCD_SharpBoosterPack_SPI(uint8_t pinChipSelect, uint8_t pinDISP, uint8_t pinVCC, bool autoVCOM, uint8_t model)
 {
@@ -156,12 +164,15 @@ LCD_SharpBoosterPack_SPI::LCD_SharpBoosterPack_SPI(uint8_t pinChipSelect, uint8_
 
     lcd_vertical_max = model;
     lcd_horizontal_max = model;
+
+#ifndef PLACE_IN_FRAM
+    if (_frameBuffer == 0){
+        _frameBuffer = new uint8_t[_index(lcd_vertical_max, lcd_horizontal_max)];
+    }
+#endif
+    DisplayBuffer = (uint8_t *) _frameBuffer;
 }
 
-LCD_SharpBoosterPack_SPI::LCD_SharpBoosterPack_SPI(uint8_t pinChipSelect, uint8_t pinDISP, uint8_t pinVCC, uint8_t model)
-{
-    LCD_SharpBoosterPack_SPI(pinChipSelect, pinDISP, pinVCC, true, model);
-}
 
 void LCD_SharpBoosterPack_SPI::setOrientation(uint8_t orientation)
 {
@@ -521,12 +532,12 @@ void LCD_SharpBoosterPack_SPI::flush(void)
     digitalWrite(_pinChipSelect, LOW);
     // clear flag to indicate command transmit is free
     flagSendToggleVCOMCommand &= ~SHARP_SEND_COMMAND_RUNNING;
+#if !defined(ti_sysbios_BIOS___VERS)
+    SendToggleVCOMCommand();  // send toggle if required
+#else
     SendToggleVCOMCommand(0); // send toggle if required
+#endif
 
-    if (LCD_auto_ulp)
-    {
-        spi_end();        // disable SPI
-    }
 }
 
 void LCD_SharpBoosterPack_SPI::flushReversed(void)
@@ -569,12 +580,11 @@ void LCD_SharpBoosterPack_SPI::flushReversed(void)
     digitalWrite(_pinChipSelect, LOW);
     // clear flag to indicate command transmit is free
     flagSendToggleVCOMCommand &= ~SHARP_SEND_COMMAND_RUNNING;
+#if !defined(ti_sysbios_BIOS___VERS)
+    SendToggleVCOMCommand();  // send toggle if required
+#else
     SendToggleVCOMCommand(0); // send toggle if required
-
-    if (LCD_auto_ulp)
-    {
-        spi_end();        // disable SPI
-    }
+#endif
 }
 
 void LCD_SharpBoosterPack_SPI::setAutoLowPowerMode(bool mode)
@@ -597,7 +607,7 @@ void LCD_SharpBoosterPack_SPI::setManualPowerMode(bool mode)
 
 
 #if !defined(ti_sysbios_BIOS___VERS)
-static void SendToggleVCOMCommand(uint32_t arg)
+static void SendToggleVCOMCommand()
 #else
 static void SendToggleVCOMCommand(UArg arg)
 #endif
@@ -617,23 +627,35 @@ static void SendToggleVCOMCommand(UArg arg)
         unsigned char command = SHARP_LCD_CMD_CHANGE_VCOM;
         command |= VCOMbit;                    //COM inversion bit
 
-        // Set P2.4 High for CS
-        digitalWrite(_pinChipSelect, HIGH);
 
         // Horrible patch for CC13x0
 #if defined(ENERGIA_ARCH_CC13XX)
-        /// @note Use shiftOut(dataPin, clockPin, bitOrder, value)
+        // Set P2.4 High for CS
+        digitalWrite(_pinChipSelect, HIGH);
+
         shiftOut(15, 7, MSBFIRST, (char)command);
         shiftOut(15, 7, MSBFIRST, (char)SHARP_LCD_TRAILER_BYTE);
+
+        // Set P2.4 High for CS
+        digitalWrite(_pinChipSelect, LOW);
 #else
         if (LCD_auto_ulp or !LCD_spi_state)
         {
             spi_begin();        // enable SPI first
         }
+
+        // Set P2.4 High for CS
+        digitalWrite(_pinChipSelect, HIGH);
+
         /// @bug Those two lines freeze on the CC1350 regardless of next bug.
         /// @bug Those two lines freeze the process if SPI is off.
         SPI.transfer((char)command);
         SPI.transfer((char)SHARP_LCD_TRAILER_BYTE);
+
+        // Wait for last byte to be sent, then drop SCS
+        delayMicroseconds(10);
+        // Set P2.4 High for CS
+        digitalWrite(_pinChipSelect, LOW);
 
         if (LCD_auto_ulp)
         {
@@ -641,10 +663,6 @@ static void SendToggleVCOMCommand(UArg arg)
         }
 #endif
 
-        // Wait for last byte to be sent, then drop SCS
-        delayMicroseconds(10);
-        // Set P2.4 High for CS
-        digitalWrite(_pinChipSelect, LOW);
 
         // clear request flag
         flagSendToggleVCOMCommand &= ~SHARP_REQUEST_TOGGLE_VCOM;
