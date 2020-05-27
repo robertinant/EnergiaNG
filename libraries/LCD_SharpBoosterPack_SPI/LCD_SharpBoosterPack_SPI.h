@@ -3,14 +3,14 @@
 //  Example for library for Sharp BoosterPack LCD 96 and 128 with hardware SPI
 //
 //
-//  Author :  Stefan Schauer
+//  Author :  StefanSch
 //  Date   :  Mar 05, 2015
-//  Version:  1.02
+//  Version:  1.05
 //  File   :  LCD_SharpBoosterPack_SPI_main.h
 //
 //  Based on the LCD5110 Library
 //  Created by Rei VILO on 28 May 2012
-//  Copyright (c) 2012 http://embeddedcomputing.weebly.com
+//  Copyright (c) 2012 https://embeddedcomputing.weebly.com
 //  Licence CC = BY SA NC
 //
 //  Edited 11 Jul 2015 by ReiVilo
@@ -21,6 +21,18 @@
 //  Added support for Sharp 128 with minimal change
 //  Added flushReversed() for reversed display and preserved buffer
 //
+//  Edited 2019-03-19 by StefaSch
+//  Added support for smaller memory with put LCD data to FRAM
+//
+//  Edited 2020-05-02 by StefanSch
+//  Added support for CC13xx to support low power consuption
+//  Added powerSave() function
+//  Replaced OneMsTimer with RTOS function if available
+//
+//  Edited 2020-05-04 by Rei Vilo
+//  Added horrible patch for CC13x0
+//  Tested against CC1352 and CC1350 LaunchPad boards
+//
 
 #ifndef LCD_SharpBoosterPack_SPI_h
 #define LCD_SharpBoosterPack_SPI_h
@@ -29,7 +41,9 @@
 #include "Terminal6.h"
 #include "Terminal12.h"
 #include <SPI.h>
+#if !defined(ti_sysbios_BIOS___VERS)
 #include <OneMsTaskTimer.h>
+#endif
 #include <Print.h>
 
 #define SHARP_96 96
@@ -45,6 +59,13 @@ tLCDWrapType;
 
 #define NUM_OF_FONTS 2
 typedef uint8_t tNumOfFontsType;
+
+typedef enum
+{
+    LCDPowerSaveOff,                    // normal operation mode
+    LCDPowerSaveOn,                     // power save mode enalbed
+}
+tLCDPowerModeType;
 
 
 ///
@@ -136,16 +157,33 @@ class LCD_SharpBoosterPack_SPI : public Print
 
     ///
     /// @brief    Get size àf the screen
-    /// @return   96 for 96x96 or &28 for 128x128
+    /// @return   96 for 96x96 or 128 for 128x128
     ///
     uint8_t getSize();
+
+    ///
+    /// @brief    PowerSave mode
+    /// @details  Turn SPI module on / off
+    /// @param    mode default=HIGH=SPI on, LOW=SPI off
+    /// @note     AutoLowPowerMode is desactivated
+    ///
+    void setManualPowerMode(bool mode = HIGH);
+
+    ///
+    /// @brief    Set automatic low power mode
+    /// @param    mode default=true
+    /// @note     If another device on the SPI bus,
+    ///           use manual setManualPowerMode() instead
+    /// @note     Desactivated by setManualPowerMode()
+    ///
+    void setAutoLowPowerMode(bool mode = true);
 
     void setLineSpacing(uint8_t pixel);
     void setXY(uint8_t x, uint8_t y, uint8_t ulValue);
     //void text(uint8_t x, uint8_t y, String s);
     void text(uint8_t x, uint8_t y, String s, tLCDWrapType wrap = LCDWrapNextLine);
     void text(uint8_t x, uint8_t y, uint8_t c) ;
-    
+
     ///
     /// @brief  Send to buffer to the screen
     /// @note   flush() preserves the buffer
@@ -169,12 +207,10 @@ class LCD_SharpBoosterPack_SPI : public Print
   private:
     uint16_t _index(uint8_t x, uint8_t y);
     tNumOfFontsType _font;
-    void TA0_enableVCOMToggle();
-    void TA0_turnOff();
+    void LCD_enableVCOMToggle();
+    void LCD_turnOff();
     uint8_t _orientation;
     bool _reverse;
-    uint8_t lcd_vertical_max;
-    uint8_t lcd_horizontal_max;
 };
 #endif
 
