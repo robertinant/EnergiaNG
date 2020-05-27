@@ -1,14 +1,14 @@
 //
-//  Sharp128 BoosterPackLCD SPI Low Power Demo
+//  Sharp128 BoosterPackLCD SPI with Low Power Feature - esp. for CC13xx
 //  Example for library for Sharp BoosterPack LCD with hardware SPI
 //
 //
-//  Author :  Stefan Schauer
-//  Date   : May. 05, 2020
+//  Author :  Stefan Sch
+//  Date   :  May. 05, 2020
 //  Version:  1.00
 //  File   :  LCD_Sharp128BoosterPack_SPI_LP_main.ino
 //
-//  Version:  1.00 : setup for Sharp128 Booster pack based on Sharp96 example
+//  Version:  1.00 : Demo with init all pins and no UART to show low power demo
 //
 //  Based on the LCD5110 Library
 //  Created by Rei VILO on 28/05/12
@@ -127,8 +127,8 @@ void loop()
     myScreen.print("ABC\nabc");
     myScreen.flush();
 
-    myScreen.powerSave(LCDPowerSaveOn);
+    myScreen.setManualPowerMode(LOW);
     delay(30000);  // power down for 30 seconds
-    myScreen.powerSave(LCDPowerSaveOff);
+    myScreen.setManualPowerMode(HIGH);
 
 }

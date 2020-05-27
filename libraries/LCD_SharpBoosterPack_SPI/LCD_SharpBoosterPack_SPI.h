@@ -5,7 +5,7 @@
 //
 //  Author :  StefanSch
 //  Date   :  Mar 05, 2015
-//  Version:  1.04
+//  Version:  1.05
 //  File   :  LCD_SharpBoosterPack_SPI_main.h
 //
 //  Based on the LCD5110 Library
@@ -24,13 +24,14 @@
 //  Edited 2019-03-19 by StefaSch
 //  Added support for smaller memory with put LCD data to FRAM
 //
-//  Edited 22 Apr 2020 by ReiVilo
-//  Horrible patch for CC13x0 ENERGIA_ARCH_CC13XX
-//
 //  Edited 2020-05-02 by StefanSch
 //  Added support for CC13xx to support low power consuption
 //  Added powerSave() function
 //  Replaced OneMsTimer with RTOS function if available
+//
+//  Edited 2020-05-04 by Rei Vilo
+//  Added horrible patch for CC13x0
+//  Tested against CC1352 and CC1350 LaunchPad boards
 //
 
 #ifndef LCD_SharpBoosterPack_SPI_h
@@ -161,18 +162,28 @@ class LCD_SharpBoosterPack_SPI : public Print
     uint8_t getSize();
 
     ///
-    /// @brief    PowerSave mode. Disables the SPI module and enalbes/disables it for any following transfer
-    /// @return   -
+    /// @brief    PowerSave mode
+    /// @details  Turn SPI module on / off
+    /// @param    mode default=HIGH=SPI on, LOW=SPI off
+    /// @note     AutoLowPowerMode is desactivated
     ///
-    void powerSave(tLCDPowerModeType);
+    void setManualPowerMode(bool mode = HIGH);
 
+    ///
+    /// @brief    Set automatic low power mode
+    /// @param    mode default=true
+    /// @note     If another device on the SPI bus,
+    ///           use manual setManualPowerMode() instead
+    /// @note     Desactivated by setManualPowerMode()
+    ///
+    void setAutoLowPowerMode(bool mode = true);
 
     void setLineSpacing(uint8_t pixel);
     void setXY(uint8_t x, uint8_t y, uint8_t ulValue);
     //void text(uint8_t x, uint8_t y, String s);
     void text(uint8_t x, uint8_t y, String s, tLCDWrapType wrap = LCDWrapNextLine);
     void text(uint8_t x, uint8_t y, uint8_t c) ;
-    
+
     ///
     /// @brief  Send to buffer to the screen
     /// @note   flush() preserves the buffer
@@ -200,8 +211,6 @@ class LCD_SharpBoosterPack_SPI : public Print
     void LCD_turnOff();
     uint8_t _orientation;
     bool _reverse;
-    uint8_t lcd_vertical_max;
-    uint8_t lcd_horizontal_max;
 };
 #endif
 
